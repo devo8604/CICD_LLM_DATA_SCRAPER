@@ -97,13 +97,22 @@ The `scrape` command clones or updates the repositories listed in `repos.txt`.
 python3 main.py scrape
 ```
 
-### Prepare
+### Export
 
-The `prepare` command processes the files in the `repos` directory and generates question-and-answer pairs.
+The `export` command exports the Q&A data to a file.
 
 ```bash
-python3 main.py prepare
+python3 main.py export --template <format> --output-file <path>
 ```
+
+Supported formats:
+
+-   `csv`
+-   `llama3`
+-   `mistral`
+-   `gemma`
+-   `alpaca-jsonl`
+-   `chatml-jsonl`
 
 You can customize the behavior of the `prepare` command with the following options:
 
@@ -171,3 +180,4 @@ Stores information about files that failed to process.
 | `file_path` | `TEXT`    | The path to the failed file               |
 | `reason`    | `TEXT`    | The reason for the failure                |
 | `failed_at` | `TIMESTAMP`| When the failure occurred                 |
+

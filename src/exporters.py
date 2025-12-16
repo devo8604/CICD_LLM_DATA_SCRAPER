@@ -1,8 +1,9 @@
 import json
 import logging
 import os
-import sqlite3  # Keep for potential direct db access or as a placeholder
-from datetime import datetime  # Import datetime for timestamp
+import sqlite3
+from datetime import datetime
+import csv
 
 from src.db_manager import DBManager
 from src.config import AppConfig
@@ -86,6 +87,11 @@ class DataExporter:
         final_assistant_content = "\n".join(assistant_content_list)
 
         match template_name:
+            case "csv":
+                return {
+                    "user_content": final_user_content,
+                    "assistant_content": final_assistant_content,
+                }
             case "llama3":
                 return config.LLAMA3_CHAT_TEMPLATE.format(
                     system_content=(
@@ -131,8 +137,22 @@ class DataExporter:
         self, template_name, output_file
     ):  # Renamed format_type to template_name
         all_conversations = self._get_all_conversations()
-        exported_lines = []
+        
+        if template_name == "csv":
+            with open(output_file, "w", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["user_content", "assistant_content"])
+                writer.writeheader()
+                for conversation in all_conversations:
+                    formatted_entry = self._format_conversation_to_template(
+                        conversation, template_name
+                    )
+                    writer.writerow(formatted_entry)
+            logging.info(
+                f"Successfully exported {len(all_conversations)} conversations to {output_file} in CSV format."
+            )
+            return
 
+        exported_lines = []
         for conversation in all_conversations:
             # Check if the template directly produces a JSON object or a string
             if template_name in ["alpaca-jsonl", "chatml-jsonl"]:

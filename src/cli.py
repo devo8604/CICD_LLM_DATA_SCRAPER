@@ -16,23 +16,53 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="LLM Data Pipeline for Git repositories."
     )
-    parser.add_argument(
-        "command",
-        choices=["scrape", "prepare", "retry"],
-        help="Command to execute: 'scrape' to clone/update repos, 'prepare' to process files and generate Q&A, 'retry' to re-process failed files.",
-    )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Scrape command
+    scrape_parser = subparsers.add_parser("scrape", help="Clone/update repos.")
+    
+    # Prepare command
+    prepare_parser = subparsers.add_parser("prepare", help="Process files and generate Q&A.")
+    prepare_parser.add_argument(
         "--max-tokens",
         type=int,
         default=config.DEFAULT_MAX_TOKENS,
         help="Maximum number of tokens for LLM generated answers.",
     )
-    parser.add_argument(
+    prepare_parser.add_argument(
         "--temperature",
         type=float,
         default=config.DEFAULT_TEMPERATURE,
         help="Sampling temperature for LLM generated questions. Lower values make output more deterministic, higher values make it more creative. (0.0 to 1.0)",
     )
+    
+    # Retry command
+    retry_parser = subparsers.add_parser("retry", help="Re-process failed files.")
+
+    # Export command
+    export_parser = subparsers.add_parser("export", help="Export Q&A data.")
+    export_parser.add_argument(
+        "--template",
+        type=str,
+        choices=[
+            "csv",
+            "llama3",
+            "mistral",
+            "gemma",
+            "alpaca-jsonl",
+            "chatml-jsonl",
+        ],
+        required=True,
+        help="Desired output template for fine-tuning data.",
+    )
+    export_parser.add_argument(
+        "--output-file",
+        type=str,
+        required=True,
+        help="Path to the output JSONL file.",
+    )
+
+    # Global arguments
     parser.add_argument(
         "--max-file-size",
         type=int,

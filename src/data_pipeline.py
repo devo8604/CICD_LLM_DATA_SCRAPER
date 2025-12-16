@@ -467,6 +467,22 @@ class DataPipeline:
         tqdm_logger.info("Retry operation completed.")
         self.db_manager.close_db()
 
+    def export_data(self, template_name: str, output_file: str):
+        """
+        Export data using a specified template.
+        Args:
+            template_name: The name of the template to use for formatting.
+            output_file: The path to the output file.
+        """
+        tqdm_logger.info(f"Starting data export with template '{template_name}' to '{output_file}'...")
+        exporter = DataExporter(self.db_manager.db_path)
+        try:
+            exporter.export_data(template_name, output_file)
+        except Exception as e:
+            tqdm_logger.error(f"An error occurred during data export: {e}", exc_info=True)
+        finally:
+            exporter.close()
+
     def close(self):
         try:
             self.db_manager.close_db()

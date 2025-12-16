@@ -37,6 +37,8 @@ def main() -> None:
         configure_tqdm_logging(log_file_path)
     elif args.command == "retry":
         configure_tqdm_logging(log_file_path)
+    elif args.command == "export":
+        configure_tqdm_logging(log_file_path)
 
     # Create data directory
     data_dir = Path.cwd() / args.data_dir
@@ -61,8 +63,8 @@ def main() -> None:
         db_manager=db_manager,
         file_manager=file_manager,
         base_dir=config.BASE_DIR,
-        max_tokens=args.max_tokens,
-        temperature=args.temperature,
+        max_tokens=args.max_tokens if args.command == "prepare" else config.DEFAULT_MAX_TOKENS,
+        temperature=args.temperature if args.command == "prepare" else config.DEFAULT_TEMPERATURE,
         data_dir=args.data_dir,
     )
 
@@ -74,6 +76,8 @@ def main() -> None:
             asyncio.run(pipeline.prepare())
         elif args.command == "retry":
             asyncio.run(pipeline.retry_failed_files())
+        elif args.command == "export":
+            pipeline.export_data(args.template, args.output_file)
     except KeyboardInterrupt:
         print("\n\nInterrupted by user. Exiting gracefully...")
         sys.exit(0)
