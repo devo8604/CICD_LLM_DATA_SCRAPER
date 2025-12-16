@@ -19,6 +19,9 @@ from src.file_manager import FileManager
 
 def main() -> None:
     """Main entry point for the LLM Data Pipeline."""
+    # Clear the screen at startup
+    os.system('cls' if os.name == 'nt' else 'clear')
+
     # Load configuration
     config = AppConfig()
 
