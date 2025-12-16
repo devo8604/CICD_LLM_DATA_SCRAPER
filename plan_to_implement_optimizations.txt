@@ -1,0 +1,15 @@
+Implementing all the suggested optimizations and modularity improvements is a **very significant undertaking** that amounts to a near-complete re-architecture of the current codebase. It will introduce new external dependencies and substantial changes across almost all existing files, as well as the creation of several new modules.
+
+Here's a breakdown of the major changes involved:
+
+1.  **Asynchronous Processing:** This means converting much of the synchronous code (especially network calls in `LLMClient` and potentially file I/O) to use `asyncio`. This will require new libraries like `httpx` (for async HTTP requests) and careful management of async loops.
+2.  **ORM Integration (e.g., SQLAlchemy):** Replacing direct `sqlite3` cursor calls with an Object-Relational Mapper (ORM) will significantly change `src/db_manager.py` and how `DataPipeline` interacts with the database. This is a large conceptual shift.
+3.  **Dependency Injection:** Modifying `DataPipeline` to receive its dependencies (like `LLMClient`, `DBManager`) rather than instantiating them directly.
+4.  **Batching LLM Requests:** This will require changes in `LLMClient` and how `DataPipeline` calls it.
+5.  **File Manager Class:** Extracting file system interaction logic from `DataPipeline` into its own class.
+6.  **Configurable Prompt Templates:** Implementing a system to load and apply custom prompt templates.
+7.  **Plugin-like Exporter System:** Making the exporter extensible for new formats without code changes.
+
+**Due to the massive scope of these changes, this cannot be completed in a single interaction.** It would require many iterative steps, confirmations, and likely the introduction of a `pyproject.toml` or `requirements.txt` file to manage new dependencies.
+
+**Please confirm if you wish to proceed with this extensive refactoring.** If so, I will prepare a detailed, multi-stage plan and begin implementation incrementally. Be aware that this will involve installing new Python packages and modifying most of the existing code.

@@ -1,0 +1,165 @@
+import json
+import logging
+import os
+import sqlite3  # Keep for potential direct db access or as a placeholder
+from datetime import datetime  # Import datetime for timestamp
+
+from src.db_manager import DBManager
+from src.config import AppConfig
+
+# Initialize config instance
+config = AppConfig()
+
+
+class DataExporter:
+
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.db_manager = DBManager(db_path)
+
+    def _get_all_conversations(self):
+        self.db_manager.cursor.execute(
+            """
+            SELECT
+                TS.sample_id,
+                TS.dataset_source,
+                TS.creation_date,
+                TS.model_type_intended,
+                TS.sample_quality_score,
+                TS.is_multiturn,
+                CT.turn_index,
+                CT.role,
+                CT.content,
+                CT.is_label,
+                CT.metadata_json
+            FROM
+                TrainingSamples AS TS
+            JOIN
+                ConversationTurns AS CT
+            ON
+                TS.sample_id = CT.sample_id
+            ORDER BY
+                TS.sample_id, CT.turn_index
+            """
+        )
+        rows = self.db_manager.cursor.fetchall()
+
+        conversations = {}
+        for row in rows:
+            sample_id = row[0]
+            if sample_id not in conversations:
+                conversations[sample_id] = {
+                    "sample_id": sample_id,
+                    "dataset_source": row[1],
+                    "creation_date": row[2],
+                    "model_type_intended": row[3],
+                    "sample_quality_score": row[4],
+                    "is_multiturn": bool(row[5]),
+                    "turns": [],
+                }
+            conversations[sample_id]["turns"].append(
+                {
+                    "turn_index": row[6],
+                    "role": row[7],
+                    "content": row[8],
+                    "is_label": bool(row[9]),
+                    "metadata_json": row[10],
+                }
+            )
+        return list(conversations.values())
+
+    def _format_conversation_to_template(self, conversation, template_name):
+        system_content = ""
+        user_content_list = []
+        assistant_content_list = []
+
+        # Extract roles and content from turns
+        for turn in conversation["turns"]:
+            if turn["role"] == "system":
+                system_content = turn["content"]
+            elif turn["role"] == "user":
+                user_content_list.append(turn["content"])
+            elif turn["role"] == "assistant":
+                assistant_content_list.append(turn["content"])
+
+        final_user_content = "\n".join(user_content_list)
+        final_assistant_content = "\n".join(assistant_content_list)
+
+        match template_name:
+            case "llama3":
+                return config.LLAMA3_CHAT_TEMPLATE.format(
+                    system_content=(
+                        system_content
+                        if system_content
+                        else "You are a helpful AI assistant."
+                    ),
+                    user_content=final_user_content,
+                    assistant_content=final_assistant_content,
+                )
+            case "mistral":
+                system_and_user_content = (
+                    f"{system_content}\n\n" if system_content else ""
+                ) + final_user_content
+                return config.MISTRAL_CHAT_TEMPLATE.format(
+                    system_and_user_content=system_and_user_content,
+                    assistant_content=final_assistant_content,
+                )
+            case "gemma":
+                return config.GEMMA_CHAT_TEMPLATE.format(
+                    user_content=final_user_content,
+                    assistant_content=final_assistant_content,
+                )
+            case "alpaca-jsonl":
+                return {
+                    "instruction": final_user_content,
+                    "input": "",
+                    "output": final_assistant_content,
+                }
+            case "chatml-jsonl":
+                messages = []
+                if system_content:
+                    messages.append({"role": "system", "content": system_content})
+                messages.append({"role": "user", "content": final_user_content})
+                messages.append(
+                    {"role": "assistant", "content": final_assistant_content}
+                )
+                return {"messages": messages}
+            case _:
+                raise ValueError(f"Unsupported template name: {template_name}")
+
+    def export_data(
+        self, template_name, output_file
+    ):  # Renamed format_type to template_name
+        all_conversations = self._get_all_conversations()
+        exported_lines = []
+
+        for conversation in all_conversations:
+            # Check if the template directly produces a JSON object or a string
+            if template_name in ["alpaca-jsonl", "chatml-jsonl"]:
+                formatted_entry = self._format_conversation_to_template(
+                    conversation, template_name
+                )
+                # Ensure it's a dictionary/list before dumping
+                if isinstance(formatted_entry, (dict, list)):
+                    exported_lines.append(json.dumps(formatted_entry))
+                else:
+                    logging.error(
+                        f"Template '{template_name}' did not return a JSON-serializable object for conversation {conversation['sample_id']}."
+                    )
+                    continue
+            else:
+                formatted_string = self._format_conversation_to_template(
+                    conversation, template_name
+                )
+                if formatted_string:  # Only add if formatting was successful
+                    exported_lines.append(formatted_string)
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            for line in exported_lines:
+                f.write(line + "\n")
+        logging.info(
+            f"Successfully exported {len(exported_lines)} conversations to {output_file} in {template_name} format."
+        )
+
+    def close(self):
+        self.db_manager.close_db()

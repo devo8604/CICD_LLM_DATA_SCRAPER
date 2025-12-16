@@ -1,0 +1,4 @@
+gitpython
+requests
+beautifulsoup4
+tqdm

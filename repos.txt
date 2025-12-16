@@ -1,0 +1,17 @@
+# Add one Git repository URL per line.
+# For example:
+https://github.com/google/generative-ai-python
+https://github.com/kubernetes
+https://github.com/siderolabs/talos
+https://github.com/k3s-io/k3s/
+https://github.com/metallb/
+https://github.com/traefik/
+https://github.com/helm/
+https://github.com/argoproj
+https://gitlab.com/gitlab-org/gitlab
+https://github.com/golang
+https://github.com/PacktPublishing/Complete-Bash-Shell-Scripting-
+https://github.com/containers
+https://github.com/docker
+https://github.com/python/cpython
+https://github.com/opentofu/opentofu
