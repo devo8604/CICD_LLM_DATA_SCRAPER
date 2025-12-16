@@ -49,6 +49,7 @@ class AppConfig:
         ".pack",
         ".DS_Store",
         ".pdf",
+        ".pptx",
     )
 
     # --- Chat Templates ---
