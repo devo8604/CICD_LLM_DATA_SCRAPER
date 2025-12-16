@@ -173,7 +173,6 @@ class LLMClient:
                                 except Exception as e:
                                     logging.error(f"Error processing stream chunk: {e}")
                                     continue
-                    logging.info(f"LLM streaming response for {function_name} completed.")
                     # If stream completes successfully, break retry loop
                     break
                 except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError) as e:
@@ -193,9 +192,8 @@ class LLMClient:
                         await asyncio.sleep(self.retry_delay)
                      else:
                         return None
-        logging.info(f"LLM API call for {function_name} finished all retries.")
+
         if full_response:
-            logging.info(f"Returning successful response for {function_name}.")
             # Mimic the non-streaming response structure
             return {"choices": [{"message": {"content": full_response.strip()}}]}
         else:

@@ -129,7 +129,6 @@ class DataPipeline:
         current_file_qa_entries = []
 
         try:
-            logging.info(f"Processing file: {file_name}")
             if pbar is not None: pbar.set_description(f"File: {file_name[:64]:<64} | Reading")
             def read_file_content():
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -154,11 +153,9 @@ class DataPipeline:
                 return (True, 0)
 
             if pbar is not None: pbar.set_description(f"File: {file_name[:64]:<64} | Gen Qs")
-            logging.info(f"Calling LLM to generate questions for {file_name}...")
             all_questions_for_file = await self.llm_client.generate_questions(
                 content, self.temperature, self.max_tokens, pbar
             )
-            logging.info(f"LLM call to generate questions for {file_name} completed.")
 
             if all_questions_for_file is None:
                 tqdm_logger.error(f"LLM failed to generate questions for {file_name}.")
@@ -180,11 +177,9 @@ class DataPipeline:
 
             for i, question in enumerate(unanswered_questions):
                 if pbar is not None: pbar.set_description(f"File: {file_name[:64]:<64} | Ans Q {i+1}/{len(unanswered_questions)}")
-                logging.info(f"Calling LLM to answer question {i+1}/{len(unanswered_questions)} for {file_name}...")
                 answer = await self.llm_client.get_answer_single(
                     question, content, self.temperature, self.max_tokens, pbar
                 )
-                logging.info(f"LLM call to answer question {i+1}/{len(unanswered_questions)} for {file_name} completed.")
 
                 if answer is None:
                     tqdm_logger.error(f"LLM failed to generate answer in {file_name}.")
@@ -202,11 +197,9 @@ class DataPipeline:
                 self.db_manager.save_file_hash(file_path, current_file_hash)
                 self.db_manager.remove_failed_file(file_path) # Remove from failed list on success
                 if pbar is not None: pbar.set_description(f"File: {file_name[:64]:<64} | Done")
-                logging.info(f"Finished processing and saving Q&A for {file_name}. Generated {len(current_file_qa_entries)} Q&A pairs.")
                 return (True, len(current_file_qa_entries))
             else: # No new entries or processing failed
                 if pbar is not None: pbar.set_description(f"File: {file_name[:64]:<64} | No new Qs")
-                logging.info(f"Finished processing {file_name}. No new Q&A pairs generated or saved.")
                 return (True, 0)
 
         except Exception as e:
@@ -228,7 +221,6 @@ class DataPipeline:
     ) -> list[tuple[str, bool, int]]:
         results = []
         tasks = []
-        logging.info(f"Starting processing for batch {batch_num}/{total_batches} in repo {repo_name} with {len(files)} files.")
 
         async def process_with_semaphore(file_path: str, pbar_position: int):
             async with semaphore:
@@ -244,11 +236,11 @@ class DataPipeline:
                 # Log results after processing
                 if success:
                     if qa_count > 0:
-                        logging.debug(f"    ✓ Processed {os.path.basename(file_path)}: {qa_count} Q&A pairs")
+                        tqdm_logger.debug(f"    ✓ Processed {os.path.basename(file_path)}: {qa_count} Q&A pairs")
                     else:
-                         logging.debug(f"    - Skipped {os.path.basename(file_path)} (unchanged or no new Qs)")
+                         tqdm_logger.debug(f"    - Skipped {os.path.basename(file_path)} (unchanged or no new Qs)")
                 else:
-                    logging.warning(f"    ✗ Failed to process {os.path.basename(file_path)}")
+                    tqdm_logger.warning(f"    ✗ Failed to process {os.path.basename(file_path)}")
 
                 return (file_path, success, qa_count)
 
@@ -266,8 +258,8 @@ class DataPipeline:
                 except Exception as e:
                     # This part might be redundant if errors are caught inside process_with_semaphore
                     # but it's good for catching unexpected task-level failures.
-                    logging.error(f"A task in the batch failed unexpectedly: {e}", exc_info=True)
-        logging.info(f"Finished processing batch {batch_num}/{total_batches} in repo {repo_name}.")
+                    tqdm_logger.error(f"A task in the batch failed unexpectedly: {e}", exc_info=True)
+
         return results
 
     async def scrape(self):
@@ -331,20 +323,20 @@ class DataPipeline:
         root_logger.info("Scrape operation completed.")
 
     async def prepare(self):
-        logging.info("Starting prepare operation: Processing files and generating Q&A...")
+        tqdm_logger.info("Starting prepare operation: Processing files and generating Q&A...")
 
         # --- Cleanup ---
         tracked_files = self.db_manager.get_all_tracked_files()
-        logging.info(f"Checking {len(tracked_files)} previously tracked files for existence...")
+        tqdm_logger.info(f"Checking {len(tracked_files)} previously tracked files for existence...")
         removed_files_count = 0
         for file_path in tracked_files:
             if not os.path.exists(file_path):
-                logging.info(f"File '{file_path}' no longer exists. Removing associated data.")
+                tqdm_logger.info(f"File '{file_path}' no longer exists. Removing associated data.")
                 self.db_manager.delete_samples_for_file(file_path)
                 self.db_manager.delete_file_hash(file_path)
                 removed_files_count += 1
         if removed_files_count > 0:
-            logging.info(f"Cleaned up data for {removed_files_count} removed files.")
+            tqdm_logger.info(f"Cleaned up data for {removed_files_count} removed files.")
 
         # --- Discover Repos and Set Total for Progress Bar ---
         all_repos = []
@@ -354,18 +346,16 @@ class DataPipeline:
                 dirs[:] = []  # Prune search to avoid descending into .git or sub-repos
         all_repos.sort()
         total_repos = len(all_repos)
-        logging.info(f"Discovered {total_repos} repositories for processing.")
 
         # --- Resume Logic ---
         repo_start_index = 0
         if self.state["current_repo_name"] and self.state["current_repo_name"] in all_repos:
             repo_start_index = all_repos.index(self.state["current_repo_name"])
             # The initial value of the progress bar will be this index.
-            logging.info(f"Resuming from repository {repo_start_index + 1}/{total_repos}: {os.path.basename(self.state['current_repo_name'])}")
+            tqdm_logger.info(f"Resuming from repository {repo_start_index + 1}/{total_repos}: {os.path.basename(self.state['current_repo_name'])}")
         else:
             self.state["current_repo_name"] = None
             self.state["processed_repos_count"] = 0
-            logging.info("Starting new prepare operation from the first repository.")
 
         # --- Main Processing Loop ---
         repo_tqdm = tqdm(total=total_repos, initial=repo_start_index, desc="Total Repo Progress", unit="repo", dynamic_ncols=True, position=0, leave=True)
@@ -374,23 +364,19 @@ class DataPipeline:
         for repo_path in all_repos[repo_start_index:]:
             repo_name = os.path.basename(repo_path)
             repo_tqdm.set_description(f"Total Repo Progress (Current: {repo_name})")
-            logging.info(f"Starting processing for repository: {repo_name}")
             
             self.state["current_repo_name"] = repo_path
             self._save_state()
 
             all_files_in_repo = sorted(self.file_manager.get_all_files_in_repo(repo_path))
             total_files_in_repo = len(all_files_in_repo)
-            logging.info(f"Found {total_files_in_repo} files in repository: {repo_name}")
             
             file_start_index = 0
             if self.state.get("current_file_path_in_repo") and os.path.dirname(self.state["current_file_path_in_repo"]) == repo_path:
                 try:
                     file_start_index = all_files_in_repo.index(self.state["current_file_path_in_repo"])
-                    logging.info(f"Resuming from file {file_start_index + 1}/{total_files_in_repo}: {os.path.basename(self.state['current_file_path_in_repo'])} in {repo_name}")
                 except ValueError:
                     file_start_index = 0 
-                    logging.info(f"Could not find last processed file '{self.state['current_file_path_in_repo']}'. Starting from first file in {repo_name}.")
             
             # Reset and configure the file progress bar for the current repo
             repo_file_pbar.reset(total=total_files_in_repo)
@@ -404,20 +390,18 @@ class DataPipeline:
                 
                 if self.config.MAX_CONCURRENT_FILES == 1:
                     # Sequential processing
-                    logging.info(f"Processing {len(files_to_process)} files sequentially in {repo_name}.")
                     for file_path in files_to_process:
                         pause_on_low_battery()
                         pbar = tqdm(total=1, desc=f"Starting {os.path.basename(file_path)[:64]}...", position=2, leave=False, dynamic_ncols=True, unit="Q")
                         success, qa_count = await self._process_single_file(file_path, repo_name, pbar=pbar)
                         repo_file_pbar.update(1)
                         if success and qa_count > 0:
-                            logging.debug(f"    ✓ Processed {os.path.basename(file_path)}: {qa_count} Q&A pairs")
+                            tqdm_logger.debug(f"    ✓ Processed {os.path.basename(file_path)}: {qa_count} Q&A pairs")
                         elif not success:
-                            logging.warning(f"    ✗ Failed to process {os.path.basename(file_path)}")
+                            tqdm_logger.warning(f"    ✗ Failed to process {os.path.basename(file_path)}")
                 else:
                     # Concurrent batch processing
                     total_batches = (len(files_to_process) + self.config.FILE_BATCH_SIZE - 1) // self.config.FILE_BATCH_SIZE
-                    logging.info(f"Processing {len(files_to_process)} files in {total_batches} batches (concurrently) in {repo_name}.")
                     for i, batch_start in enumerate(range(0, len(files_to_process), self.config.FILE_BATCH_SIZE)):
                         batch_files = files_to_process[batch_start : batch_start + self.config.FILE_BATCH_SIZE]
                         
@@ -428,22 +412,15 @@ class DataPipeline:
                         self._save_state()
 
             except KeyboardInterrupt:
-                logging.warning(f"KeyboardInterrupt detected. Saving state and exiting for repo: {repo_name}.")
                 self._save_state()
                 self.db_manager.close_db()
                 raise
-            except Exception as e:
-                logging.critical(f"An unexpected error occurred during processing of repo {repo_name}: {e}", exc_info=True)
-                self.db_manager.add_failed_file(repo_name, f"Unexpected error during repo processing: {e}")
-                # Decide whether to continue to next repo or re-raise
-                # For now, let's log and continue to allow other repos to process
-                
+
             repo_tqdm.update(1)
             self.state["processed_repos_count"] = repo_tqdm.n
             self.state["current_file_path_in_repo"] = None
             self.state["processed_files_count_in_repo"] = 0 # Reset for next repo
             self._save_state()
-            logging.info(f"Finished processing for repository: {repo_name}")
 
         repo_tqdm.close()
         repo_file_pbar.close()
@@ -452,43 +429,42 @@ class DataPipeline:
         self.state = {"current_repo_name": None, "processed_repos_count": 0, "current_file_path_in_repo": None, "processed_files_count_in_repo": 0}
         self._save_state()
         
-        logging.info("Prepare operation completed.")
-        
+        tqdm_logger.info("Prepare operation completed.")
         self.db_manager.close_db()
 
     async def retry_failed_files(self):
         """
         Retry processing files that previously failed.
         """
-        logging.info("Starting retry operation for failed files...")
+        tqdm_logger.info("Starting retry operation for failed files...")
         failed_files = self.db_manager.get_failed_files()
 
         if not failed_files:
-            logging.info("No failed files to retry.")
+            tqdm_logger.info("No failed files to retry.")
             return
 
-        logging.info(f"Found {len(failed_files)} failed files to retry.")
+        tqdm_logger.info(f"Found {len(failed_files)} failed files to retry.")
 
         repo_file_pbar = tqdm(total=len(failed_files), desc="Retrying failed files", unit="file", dynamic_ncols=True, position=0, leave=True)
 
         for file_path, reason in failed_files:
             repo_name = os.path.basename(os.path.dirname(file_path))
-            logging.info(f"Retrying {file_path} (reason: {reason})")
+            tqdm_logger.info(f"Retrying {file_path} (reason: {reason})")
             
             pbar = tqdm(total=1, desc=f"Retrying {os.path.basename(file_path)[:64]}...", position=1, leave=False, dynamic_ncols=True, unit="Q")
             
             success, qa_count = await self._process_single_file(file_path, repo_name, pbar=pbar)
             
             if success:
-                logging.info(f"Successfully processed {file_path}. Removing from failed list.")
+                tqdm_logger.info(f"Successfully processed {file_path}. Removing from failed list.")
                 self.db_manager.remove_failed_file(file_path)
             else:
-                logging.error(f"Failed to process {file_path} again.")
+                tqdm_logger.error(f"Failed to process {file_path} again.")
             
             repo_file_pbar.update(1)
 
         repo_file_pbar.close()
-        logging.info("Retry operation completed.")
+        tqdm_logger.info("Retry operation completed.")
         self.db_manager.close_db()
 
     def export_data(self, template_name: str, output_file: str):
@@ -498,12 +474,12 @@ class DataPipeline:
             template_name: The name of the template to use for formatting.
             output_file: The path to the output file.
         """
-        logging.info(f"Starting data export with template '{template_name}' to '{output_file}'...")
+        tqdm_logger.info(f"Starting data export with template '{template_name}' to '{output_file}'...")
         exporter = DataExporter(self.db_manager.db_path)
         try:
             exporter.export_data(template_name, output_file)
         except Exception as e:
-            logging.error(f"An error occurred during data export: {e}", exc_info=True)
+            tqdm_logger.error(f"An error occurred during data export: {e}", exc_info=True)
         finally:
             exporter.close()
 
