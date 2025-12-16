@@ -79,7 +79,9 @@ class LLMClient:
 
     async def _get_available_llm_models_sync_wrapper(self) -> list[str]:
         """Wrapper to manage async client lifecycle."""
-        async with httpx.AsyncClient() as client:
+        # Set a default timeout for the client to cover connection, read, and write
+        timeout = httpx.Timeout(30.0, connect=10.0)  # 10s for connect, 30s total
+        async with httpx.AsyncClient(timeout=timeout) as client:
             return await self._get_available_llm_models(client)
 
     async def _get_available_llm_models(self, client: httpx.AsyncClient) -> list[str]:
@@ -98,7 +100,7 @@ class LLMClient:
         models_api_url = f"{self.base_url}/v1/models"
         try:
             logging.info(f"Sending GET request to {models_api_url} for model list.")
-            response = await client.get(models_api_url, timeout=30)  # 30 second timeout
+            response = await client.get(models_api_url)  # Timeout is now handled by the client instance
             logging.info(f"Received response from {models_api_url}. Status: {response.status_code}")
             response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
             models_data = response.json()
@@ -113,14 +115,15 @@ class LLMClient:
             logging.info(f"Successfully retrieved and parsed model list: {models}")
             return models
         except httpx.ConnectError as e:
-            logging.error(f"Could not connect to LLM server at {models_api_url}: {e}")
+            logging.error(f"Connection error to LLM server at {models_api_url}: {e}")
             return []
-        except httpx.TimeoutException:
+        except httpx.ReadTimeout:
             logging.error(
-                f"Timeout while connecting to LLM server at {models_api_url}."
+                f"Read timeout while waiting for response from LLM server at {models_api_url}. "
+                "The server accepted the connection but did not send a complete response within the timeout period."
             )
             return []
-        except httpx.RequestError as e:  # Catch all httpx request errors
+        except httpx.RequestError as e:  # Catch all other httpx request errors
             logging.error(
                 f"Failed to retrieve LLM model list from {models_api_url}: {e}"
             )
