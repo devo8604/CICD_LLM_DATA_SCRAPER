@@ -25,9 +25,10 @@ class StateManager:
     def _connect_db(self) -> None:
         """Establish database connection."""
         try:
+            logging.info("Attempting to connect to database from StateManager...")
             self.conn = sqlite3.connect(str(self.db_path))
             self.cursor = self.conn.cursor()
-            logging.debug(f"StateManager connected to database: {self.db_path}")
+            logging.info(f"StateManager connected to database: {self.db_path}")
         except sqlite3.Error as e:
             logging.critical(f"Error connecting to database {self.db_path}: {e}")
             raise

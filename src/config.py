@@ -4,9 +4,9 @@ import os
 
 class AppConfig:
     # --- LLM Client Settings ---
-    LLM_BASE_URL: str = "http://localhost:11454"
+    LLM_BASE_URL: str = "http://localhost:11973"
     LLM_MODEL_NAME: str = (
-        "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+        "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit"
     )
     LLM_MAX_RETRIES: int = 3
     LLM_RETRY_DELAY: int = 5  # seconds
