@@ -202,7 +202,7 @@ async def _run_git_command(cmd: list[str], cwd: str | None = None) -> tuple[bool
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=cwd
+            cwd=cwd,
         )
         stdout, stderr = await process.communicate()
 
@@ -254,17 +254,15 @@ async def clone_or_update_repos(repos_dir: str, repo_urls: list[str]) -> None:
             )
             # Discard any local changes
             success, output = await _run_git_command(
-                ["git", "reset", "--hard", "HEAD"],
-                cwd=final_repo_path
+                ["git", "reset", "--hard", "HEAD"], cwd=final_repo_path
             )
             if not success:
                 logging.error(f"Error resetting {repo_name_from_url}: {output}")
-                continue # Skip to next repo if reset fails
+                continue  # Skip to next repo if reset fails
 
             # Async git pull
             success, output = await _run_git_command(
-                ["git", "pull"],
-                cwd=final_repo_path
+                ["git", "pull"], cwd=final_repo_path
             )
             if success:
                 logging.debug(f"Successfully updated {repo_name_from_url}")

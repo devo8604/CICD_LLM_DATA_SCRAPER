@@ -56,7 +56,7 @@ def configure_tqdm_logging(log_file_path: str | Path) -> None:
     root_logger.setLevel(logging.DEBUG)
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
-    
+
     file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     file_handler = logging.FileHandler(str(log_file_path), mode="a")
     file_handler.setLevel(logging.INFO)
@@ -66,15 +66,15 @@ def configure_tqdm_logging(log_file_path: str | Path) -> None:
     # Configure the dedicated tqdm logger
     tqdm_logger = logging.getLogger("tqdm_logger")
     tqdm_logger.setLevel(logging.INFO)
-    tqdm_logger.propagate = False # Prevent messages from going to the root logger
-    
+    tqdm_logger.propagate = False  # Prevent messages from going to the root logger
+
     # Remove old handlers from tqdm_logger if any
     for handler in tqdm_logger.handlers[:]:
         tqdm_logger.removeHandler(handler)
 
-    tqdm_formatter = logging.Formatter("%(message)s") # Simple formatter for tqdm
+    tqdm_formatter = logging.Formatter("%(message)s")  # Simple formatter for tqdm
     tqdm_handler = TqdmLoggingHandler(level=logging.ERROR)
     tqdm_handler.setFormatter(tqdm_formatter)
     tqdm_logger.addHandler(tqdm_handler)
-    
+
     logging.info(f"Tqdm logging configured. Log file: {log_file_path}")

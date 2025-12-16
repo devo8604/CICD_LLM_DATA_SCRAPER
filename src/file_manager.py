@@ -40,7 +40,8 @@ class FileManager:
                         continue
 
                     if any(
-                        file_path.endswith(ext) for ext in config.EXCLUDED_FILE_EXTENSIONS
+                        file_path.endswith(ext)
+                        for ext in config.EXCLUDED_FILE_EXTENSIONS
                     ):
                         skipped_count_in_repo += 1
                         continue

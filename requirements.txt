@@ -3,3 +3,5 @@ requests
 beautifulsoup4
 tqdm
 httpx
+mlx
+mlx-lm

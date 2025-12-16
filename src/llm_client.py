@@ -5,12 +5,13 @@ import asyncio
 import time
 
 from src.config import AppConfig
+from src.protocols import LLMInterface
 
 # Initialize config instance
 config = AppConfig()
 
 
-class LLMClient:
+class LLMClient(LLMInterface):
     """LLM client with caching and retry logic for OpenAI-compatible APIs."""
 
     # Class-level cache for model list
@@ -36,10 +37,17 @@ class LLMClient:
         try:
             # Call async method from sync __init__ using asyncio.run for initial check
             logging.info("Calling _get_available_llm_models_sync_wrapper in __init__.")
-            available_models = asyncio.run(self._get_available_llm_models_sync_wrapper())
-            logging.info(f"Finished _get_available_llm_models_sync_wrapper in __init__. Found models: {available_models}")
+            available_models = asyncio.run(
+                self._get_available_llm_models_sync_wrapper()
+            )
+            logging.info(
+                f"Finished _get_available_llm_models_sync_wrapper in __init__. Found models: {available_models}"
+            )
         except Exception as e:
-            logging.critical(f"An unexpected error occurred during initial model fetch: {e}", exc_info=True)
+            logging.critical(
+                f"An unexpected error occurred during initial model fetch: {e}",
+                exc_info=True,
+            )
             available_models = []
 
         if available_models:
@@ -92,7 +100,8 @@ class LLMClient:
         if (
             LLMClient._model_cache is not None
             and LLMClient._model_cache_time is not None
-            and (current_time - LLMClient._model_cache_time) < LLMClient._model_cache_ttl
+            and (current_time - LLMClient._model_cache_time)
+            < LLMClient._model_cache_ttl
         ):
             logging.debug("Using cached model list")
             return LLMClient._model_cache
@@ -100,8 +109,12 @@ class LLMClient:
         models_api_url = f"{self.base_url}/v1/models"
         try:
             logging.info(f"Sending GET request to {models_api_url} for model list.")
-            response = await client.get(models_api_url)  # Timeout is now handled by the client instance
-            logging.info(f"Received response from {models_api_url}. Status: {response.status_code}")
+            response = await client.get(
+                models_api_url
+            )  # Timeout is now handled by the client instance
+            logging.info(
+                f"Received response from {models_api_url}. Status: {response.status_code}"
+            )
             response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
             models_data = response.json()
             logging.info(f"Raw models response from server: {models_data}")
@@ -159,9 +172,15 @@ class LLMClient:
         async with httpx.AsyncClient() as client:
             for attempt in range(self.max_retries):
                 try:
-                    logging.info(f"Attempt {attempt + 1}/{self.max_retries}: Sending POST request to {chat_completions_url} with payload: {json.dumps(payload)}")
+                    logging.info(
+                        f"Attempt {attempt + 1}/{self.max_retries}: Sending POST request to {chat_completions_url} with payload: {json.dumps(payload)}"
+                    )
                     async with client.stream(
-                        "POST", chat_completions_url, headers=headers, json=payload, timeout=300
+                        "POST",
+                        chat_completions_url,
+                        headers=headers,
+                        json=payload,
+                        timeout=300,
                     ) as response:
                         response.raise_for_status()
                         async for line in response.aiter_lines():
@@ -173,42 +192,56 @@ class LLMClient:
                                             continue
                                         if not chunk_str:
                                             continue
-                                        
+
                                         data = json.loads(chunk_str)
-                                        delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                        delta = (
+                                            data.get("choices", [{}])[0]
+                                            .get("delta", {})
+                                            .get("content", "")
+                                        )
                                         if delta:
                                             full_response += delta
                                 except json.JSONDecodeError:
-                                    logging.warning(f"Failed to decode JSON chunk: {line}")
+                                    logging.warning(
+                                        f"Failed to decode JSON chunk: {line}"
+                                    )
                                     continue
                                 except Exception as e:
                                     logging.error(f"Error processing stream chunk: {e}")
                                     continue
                     # If stream completes successfully, break retry loop
                     break
-                except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError) as e:
+                except (
+                    httpx.ConnectError,
+                    httpx.TimeoutException,
+                    httpx.RequestError,
+                ) as e:
                     logging.error(
                         f"LLM API error during {function_name} (Attempt {attempt + 1}/{self.max_retries}): {e}"
                     )
                     if attempt < self.max_retries - 1:
                         await asyncio.sleep(self.retry_delay)
                     else:
-                        logging.error(f"Failed to complete {function_name} after {self.max_retries} attempts.")
+                        logging.error(
+                            f"Failed to complete {function_name} after {self.max_retries} attempts."
+                        )
                         return None
                 except Exception as e:
-                     logging.error(
+                    logging.error(
                         f"An unexpected error occurred during {function_name} stream (Attempt {attempt + 1}/{self.max_retries}): {e}"
                     )
-                     if attempt < self.max_retries - 1:
+                    if attempt < self.max_retries - 1:
                         await asyncio.sleep(self.retry_delay)
-                     else:
+                    else:
                         return None
 
         if full_response:
             # Mimic the non-streaming response structure
             return {"choices": [{"message": {"content": full_response.strip()}}]}
         else:
-            logging.warning(f"LLM call for {function_name} resulted in an empty response.")
+            logging.warning(
+                f"LLM call for {function_name} resulted in an empty response."
+            )
             return None
 
     async def generate_questions(
@@ -283,7 +316,10 @@ class LLMClient:
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"},
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:",
+            },
         ]
         options = {
             "temperature": temperature,
@@ -304,7 +340,7 @@ class LLMClient:
         self,
         batch_of_question_context_tuples: list[tuple[str, str]],
         temperature: float,
-        max_tokens: int
+        max_tokens: int,
     ) -> list[str | None]:
         """Generate answers for multiple questions in parallel using TaskGroup."""
         results: list[str | None] = [None] * len(batch_of_question_context_tuples)

@@ -20,9 +20,11 @@ def parse_arguments() -> argparse.Namespace:
 
     # Scrape command
     scrape_parser = subparsers.add_parser("scrape", help="Clone/update repos.")
-    
+
     # Prepare command
-    prepare_parser = subparsers.add_parser("prepare", help="Process files and generate Q&A.")
+    prepare_parser = subparsers.add_parser(
+        "prepare", help="Process files and generate Q&A."
+    )
     prepare_parser.add_argument(
         "--max-tokens",
         type=int,
@@ -35,7 +37,7 @@ def parse_arguments() -> argparse.Namespace:
         default=config.DEFAULT_TEMPERATURE,
         help="Sampling temperature for LLM generated questions. Lower values make output more deterministic, higher values make it more creative. (0.0 to 1.0)",
     )
-    
+
     # Retry command
     retry_parser = subparsers.add_parser("retry", help="Re-process failed files.")
 
@@ -60,6 +62,48 @@ def parse_arguments() -> argparse.Namespace:
         type=str,
         required=True,
         help="Path to the output JSONL file.",
+    )
+
+    # MLX management command
+    mlx_parser = subparsers.add_parser(
+        "mlx", help="Manage MLX models (list, download, remove)."
+    )
+    mlx_subparsers = mlx_parser.add_subparsers(dest="mlx_command", required=True)
+
+    # MLX list command
+    mlx_list_parser = mlx_subparsers.add_parser(
+        "list", help="List locally cached MLX models."
+    )
+    mlx_list_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Show all available models (not just locally cached ones).",
+    )
+
+    # MLX download command
+    mlx_download_parser = mlx_subparsers.add_parser(
+        "download", help="Download an MLX model."
+    )
+    mlx_download_parser.add_argument(
+        "model_name",
+        type=str,
+        help="Name of the MLX model to download (e.g., mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit).",
+    )
+
+    # MLX remove command
+    mlx_remove_parser = mlx_subparsers.add_parser(
+        "remove", help="Remove a locally cached MLX model."
+    )
+    mlx_remove_parser.add_argument(
+        "model_name", type=str, help="Name of the MLX model to remove."
+    )
+
+    # MLX info command
+    mlx_info_parser = mlx_subparsers.add_parser(
+        "info", help="Get information about an MLX model."
+    )
+    mlx_info_parser.add_argument(
+        "model_name", type=str, help="Name of the MLX model to get info for."
     )
 
     # Global arguments

@@ -137,10 +137,12 @@ class DataExporter:
         self, template_name, output_file
     ):  # Renamed format_type to template_name
         all_conversations = self._get_all_conversations()
-        
+
         if template_name == "csv":
             with open(output_file, "w", encoding="utf-8", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=["user_content", "assistant_content"])
+                writer = csv.DictWriter(
+                    f, fieldnames=["user_content", "assistant_content"]
+                )
                 writer.writeheader()
                 for conversation in all_conversations:
                     formatted_entry = self._format_conversation_to_template(

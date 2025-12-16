@@ -1,12 +1,13 @@
 # src/config.py
 import os
+from typing import Optional
 
 
 class AppConfig:
     # --- LLM Client Settings ---
-    LLM_BASE_URL: str = "http://localhost:11454"
+    LLM_BASE_URL: str = "http://localhost:11454"  # llama.cpp server port
     LLM_MODEL_NAME: str = (
-        "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+        "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
     )
     LLM_MAX_RETRIES: int = 3
     LLM_RETRY_DELAY: int = 5  # seconds
@@ -54,7 +55,7 @@ class AppConfig:
 
     # --- Chat Templates ---
     QWEN_TEMPLATE: str = (
-        "<|im_start|>user\n"
+        "<|im_start|><|im_start|>user\n"
         "{instruction}"
         "<|im_end|>"
         "<|im_start|>assistant\n"
@@ -84,6 +85,33 @@ class AppConfig:
     # --- Parallel Processing Settings ---
     MAX_CONCURRENT_FILES: int = 1  # Number of files to process in parallel
     FILE_BATCH_SIZE: int = 10  # Process files in batches of this size
+
+    # --- Performance and Cache Settings ---
+    FILE_HASH_CACHE_SIZE: int = 10000  # Number of file hashes to cache in memory
+    DATABASE_CONNECTION_POOL_SIZE: int = 5  # Size of database connection pool
+    LLM_REQUEST_TIMEOUT: int = 300  # Timeout for LLM requests in seconds
+    CHUNK_READ_SIZE: int = 8192  # Size of chunks to read files in (bytes)
+
+    def __init__(self):
+        # Detect if running on Apple Silicon and enable MLX accordingly
+        import platform
+
+        machine = platform.machine()
+        system = platform.system()
+        is_apple_silicon = system == "Darwin" and (
+            "arm" in machine or "ARM" in machine or "aarch64" in machine
+        )
+
+        # Set the instance attributes based on platform detection
+        self.USE_MLX: bool = (
+            False  # Manually set to False to use llama.cpp instead of MLX
+        )
+        self.MLX_MODEL_NAME: str = (
+            "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"  # Recommended coder model
+        )
+        self.MLX_MAX_RAM_GB: int = 32  # Max RAM to use for MLX models
+        self.MLX_QUANTIZE: bool = True  # Whether to quantize models
+        self.MLX_TEMPERATURE: float = 0.7  # Default temperature for MLX generation
 
     @property
     def REPOS_DIR(self) -> str:
