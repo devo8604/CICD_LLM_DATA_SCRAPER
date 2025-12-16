@@ -149,6 +149,7 @@ class LLMClient:
         async with httpx.AsyncClient() as client:
             for attempt in range(self.max_retries):
                 try:
+                    logging.info(f"Attempt {attempt + 1}/{self.max_retries}: Sending POST request to {chat_completions_url} with payload: {json.dumps(payload)}")
                     async with client.stream(
                         "POST", chat_completions_url, headers=headers, json=payload, timeout=300
                     ) as response:
