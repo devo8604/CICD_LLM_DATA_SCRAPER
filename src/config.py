@@ -4,7 +4,7 @@ import os
 
 class AppConfig:
     # --- LLM Client Settings ---
-    LLM_BASE_URL: str = "http://192.168.0.89:11973"
+    LLM_BASE_URL: str = "http://localhost:11973"
     LLM_MODEL_NAME: str = (
         "mlx-community/Qwen2.5-Coder-32B-Instruct-4bit"
     )
