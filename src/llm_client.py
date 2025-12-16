@@ -33,8 +33,12 @@ class LLMClient:
             f"LLMClient initialized. Using model: {self.model_name} at {base_url}"
         )
 
-        # Call async method from sync __init__ using asyncio.run for initial check
-        available_models = asyncio.run(self._get_available_llm_models_sync_wrapper())
+        try:
+            # Call async method from sync __init__ using asyncio.run for initial check
+            available_models = asyncio.run(self._get_available_llm_models_sync_wrapper())
+        except Exception as e:
+            logging.critical(f"An unexpected error occurred during initial model fetch: {e}", exc_info=True)
+            available_models = []
 
         if available_models:
             if self.model_name in available_models:
@@ -89,9 +93,10 @@ class LLMClient:
 
         models_api_url = f"{self.base_url}/v1/models"
         try:
-            response = await client.get(models_api_url, timeout=10)  # 10 second timeout
+            response = await client.get(models_api_url, timeout=30)  # 30 second timeout
             response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
             models_data = response.json()
+            logging.info(f"Raw models response from server: {models_data}")
             # Assuming OpenAI-compatible API response structure: {"data": [{"id": "model_name", ...}]}
             models = [m["id"] for m in models_data.get("data", [])]
 
@@ -148,24 +153,22 @@ class LLMClient:
                         "POST", chat_completions_url, headers=headers, json=payload, timeout=300
                     ) as response:
                         response.raise_for_status()
-                        async for chunk in response.aiter_bytes():
-                            if chunk:
+                        async for line in response.aiter_lines():
+                            if line:
                                 try:
-                                    # Process server-sent events
-                                    chunk_str = chunk.decode('utf-8')
-                                    if chunk_str.startswith("data: "):
-                                        chunk_str = chunk_str[6:]
-                                    if chunk_str.strip() == "[DONE]":
-                                        continue
-                                    if not chunk_str.strip():
-                                        continue
-                                    
-                                    data = json.loads(chunk_str)
-                                    delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if delta:
-                                        full_response += delta
+                                    if line.startswith("data: "):
+                                        chunk_str = line[6:].strip()
+                                        if chunk_str == "[DONE]":
+                                            continue
+                                        if not chunk_str:
+                                            continue
+                                        
+                                        data = json.loads(chunk_str)
+                                        delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                        if delta:
+                                            full_response += delta
                                 except json.JSONDecodeError:
-                                    logging.warning(f"Failed to decode JSON chunk: {chunk_str}")
+                                    logging.warning(f"Failed to decode JSON chunk: {line}")
                                     continue
                                 except Exception as e:
                                     logging.error(f"Error processing stream chunk: {e}")
