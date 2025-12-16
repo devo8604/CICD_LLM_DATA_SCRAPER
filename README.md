@@ -6,6 +6,7 @@ An automated pipeline for generating high-quality question-and-answer training d
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+  - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Basic Usage](#basic-usage)
 - [Configuration](#configuration)
@@ -50,6 +51,11 @@ An automated pipeline for generating high-quality question-and-answer training d
 - 🗃️ **SQLite Storage**: All data stored in a portable SQLite database
 
 ## Quick Start
+
+### Prerequisites
+
+- Python 3.14 or higher
+- Git
 
 ### Installation
 

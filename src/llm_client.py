@@ -345,7 +345,7 @@ class LLMClient(LLMInterface):
         """Generate answers for multiple questions in parallel using TaskGroup."""
         results: list[str | None] = [None] * len(batch_of_question_context_tuples)
 
-        # Python 3.11+ TaskGroup for better structured concurrency
+        # Python 3.14+ TaskGroup for better structured concurrency
         async with asyncio.TaskGroup() as tg:
             tasks = []
             for i, (question, context) in enumerate(batch_of_question_context_tuples):

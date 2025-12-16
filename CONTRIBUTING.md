@@ -17,7 +17,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.14+
 - Git
 - Virtual environment tool (venv or virtualenv)
 
