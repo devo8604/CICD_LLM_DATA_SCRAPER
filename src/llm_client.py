@@ -35,9 +35,7 @@ class LLMClient:
 
         try:
             # Call async method from sync __init__ using asyncio.run for initial check
-            logging.info("Calling _get_available_llm_models_sync_wrapper in __init__.")
             available_models = asyncio.run(self._get_available_llm_models_sync_wrapper())
-            logging.info(f"Finished _get_available_llm_models_sync_wrapper in __init__. Found models: {available_models}")
         except Exception as e:
             logging.critical(f"An unexpected error occurred during initial model fetch: {e}", exc_info=True)
             available_models = []
@@ -75,7 +73,6 @@ class LLMClient:
             raise ValueError(
                 "No usable LLM model available or configured. Check LLM server and model loads."
             )
-        logging.info("LLMClient successfully initialized with a usable model.")
 
     async def _get_available_llm_models_sync_wrapper(self) -> list[str]:
         """Wrapper to manage async client lifecycle."""
@@ -84,7 +81,6 @@ class LLMClient:
 
     async def _get_available_llm_models(self, client: httpx.AsyncClient) -> list[str]:
         """Fetch available models with caching."""
-        logging.info("Attempting to get available LLM models.")
         # Check cache first
         current_time = time.time()
         if (
@@ -97,9 +93,7 @@ class LLMClient:
 
         models_api_url = f"{self.base_url}/v1/models"
         try:
-            logging.info(f"Sending GET request to {models_api_url} for model list.")
             response = await client.get(models_api_url, timeout=30)  # 30 second timeout
-            logging.info(f"Received response from {models_api_url}. Status: {response.status_code}")
             response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
             models_data = response.json()
             logging.info(f"Raw models response from server: {models_data}")
@@ -110,7 +104,6 @@ class LLMClient:
             LLMClient._model_cache = models
             LLMClient._model_cache_time = current_time
 
-            logging.info(f"Successfully retrieved and parsed model list: {models}")
             return models
         except httpx.ConnectError as e:
             logging.error(f"Could not connect to LLM server at {models_api_url}: {e}")
