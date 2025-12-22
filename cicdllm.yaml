@@ -1,0 +1,55 @@
+llm:
+  base_url: http://localhost:11454
+  model_name: unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
+  mlx_model_name: mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
+  mlx_quantize: true
+  mlx_temperature: 0.7
+  max_retries: 3
+  retry_delay: 5
+  request_timeout: 300
+  model_cache_ttl: 300
+pipeline:
+  base_dir: .
+  data_dir: data
+  repos_dir_name: repos
+  max_file_size: 5242880
+logging:
+  max_log_files: 5
+  log_file_prefix: pipeline_log
+generation:
+  default_max_tokens: 4096
+  default_temperature: 0.7
+  min_question_tokens: 25
+  max_question_tokens: 75
+  min_answer_context_tokens: 256
+  max_answer_context_tokens: 1024
+battery:
+  low_threshold: 15
+  high_threshold: 90
+  check_interval: 60
+filtering:
+  excluded_extensions:
+  - .png
+  - .jpg
+  - .jpeg
+  - .gif
+  - .bin
+  - .zip
+  - .tar
+  - .gz
+  - .svg
+  - .idx
+  - .rev
+  - .pack
+  - .DS_Store
+  - .pdf
+  - .pptx
+state:
+  save_interval: 10
+processing:
+  max_concurrent_files: 1
+  file_batch_size: 10
+performance:
+  file_hash_cache_size: 10000
+  database_connection_pool_size: 5
+  chunk_read_size: 8192

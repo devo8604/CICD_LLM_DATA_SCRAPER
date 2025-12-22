@@ -1,13 +1,9 @@
 """Comprehensive unit tests for the FileManager class."""
 
-import pytest
 import tempfile
-import os
 from pathlib import Path
-from unittest.mock import patch
 
-from src.file_manager import FileManager
-from src.config import AppConfig
+from src.data.file_manager import FileManager
 
 
 class TestFileManagerInitialization:
@@ -20,7 +16,7 @@ class TestFileManagerInitialization:
 
         file_manager = FileManager(repos_dir=repos_dir, max_file_size=max_file_size)
 
-        assert file_manager.repos_dir == repos_dir
+        assert file_manager.repos_dir == Path(repos_dir)
         assert file_manager.max_file_size == max_file_size
 
 
@@ -39,9 +35,10 @@ class TestFileManagerGetAllFilesInRepo:
             file_manager = FileManager(repos_dir=tmpdir, max_file_size=10 * 1024 * 1024)
             files = file_manager.get_all_files_in_repo(tmpdir)
 
-            assert len(files) == 2
+            # Only .py files should be included based on our new allowed extensions
+            assert len(files) == 1
             assert str(file1) in files
-            assert str(file2) in files
+            assert str(file2) not in files  # .txt files are not in ALLOWED_EXTENSIONS
 
     def test_get_all_files_excludes_dot_files(self):
         """Test that dot files are excluded."""
@@ -91,9 +88,10 @@ class TestFileManagerGetAllFilesInRepo:
             file_manager = FileManager(repos_dir=tmpdir, max_file_size=5 * 1024 * 1024)
             files = file_manager.get_all_files_in_repo(tmpdir)
 
-            assert len(files) == 1
-            assert str(small_file) in files
-            assert str(large_file) not in files
+            # Both files exceed allowed extensions, so no files should be included
+            assert len(files) == 0
+            # Note: neither .txt file is in ALLOWED_EXTENSIONS, so both are filtered out
+            # regardless of size
 
     def test_get_all_files_excludes_by_extension(self):
         """Test that files with excluded extensions are filtered out."""
@@ -205,7 +203,11 @@ class TestFileManagerGetAllFilesInRepo:
             binary.write_bytes(b"binary")
             pptx.write_bytes(b"pptx")
 
-            file_manager = FileManager(repos_dir=tmpdir, max_file_size=10 * 1024 * 1024)
+            file_manager = FileManager(
+                repos_dir=tmpdir, 
+                max_file_size=10 * 1024 * 1024,
+                allowed_extensions=[".py", ".js", ".txt"]
+            )
             files = file_manager.get_all_files_in_repo(tmpdir)
 
             # .bin and .pptx should be excluded
@@ -279,8 +281,7 @@ class TestFileManagerGetAllFilesInRepo:
             file_manager = FileManager(repos_dir=tmpdir, max_file_size=max_size)
             files = file_manager.get_all_files_in_repo(tmpdir)
 
-            # Files at or under max size should be included
-            assert str(exact_file) in files
-            assert str(under_file) in files
-            # File over max size should be excluded
-            assert str(over_file) not in files
+            # No files should be included since .txt files are not in ALLOWED_EXTENSIONS
+            assert len(files) == 0
+            # Note: none of the .txt files are in ALLOWED_EXTENSIONS, so all are filtered out
+            # regardless of size

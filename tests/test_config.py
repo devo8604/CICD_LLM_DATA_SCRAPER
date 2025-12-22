@@ -1,122 +1,115 @@
-"""Comprehensive unit tests for the AppConfig class."""
+"""Unit tests for the AppConfig module."""
+
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch, MagicMock
-import os
 
-from src.config import AppConfig
+from src.core.config import AppConfig
 
 
 class TestAppConfig:
-    """Test cases for AppConfig class."""
+    """Test cases for AppConfig."""
 
-    def test_default_llm_settings(self):
-        """Test default LLM configuration values."""
+    @pytest.fixture(autouse=True)
+    def mock_config_loader(self):
+        """Mock ConfigLoader to return empty config by default."""
+        with patch("src.core.config.ConfigLoader") as mock_loader_cls:
+            mock_loader = mock_loader_cls.return_value
+            mock_loader.load.return_value = {}
+            mock_loader.config_paths = []
+            yield mock_loader
+
+    def test_default_values(self):
+        """Test that AppConfig has correct default values."""
         config = AppConfig()
 
-        assert config.LLM_BASE_URL == "http://localhost:11454"
-        assert config.LLM_MODEL_NAME == "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+        assert config.LLM_BASE_URL == "http://localhost:11434"
         assert config.LLM_MAX_RETRIES == 3
-        assert config.LLM_RETRY_DELAY == 5
-        assert config.LLM_MODEL_CACHE_TTL == 300
-
-    def test_default_data_pipeline_settings(self):
-        """Test default data pipeline configuration values."""
-        config = AppConfig()
-
         assert config.BASE_DIR == "."
         assert config.DATA_DIR == "data"
-        assert config.REPOS_DIR_NAME == "repos"
         assert config.MAX_FILE_SIZE == 5 * 1024 * 1024
 
-    def test_default_logging_settings(self):
-        """Test default logging configuration values."""
+    def test_repos_dir_property(self, mock_config_loader):
+        """Test the REPOS_DIR property."""
+        # Mock config with custom values
+        mock_config_loader.load.return_value = {
+            "pipeline": {
+                "base_dir": "/tmp/test",
+                "repos_dir_name": "my_repos",
+            }
+        }
+
         config = AppConfig()
 
-        assert config.MAX_LOG_FILES == 5
-        assert config.LOG_FILE_PREFIX == "pipeline_log"
+        assert config.BASE_DIR == "/tmp/test"
+        assert config.REPOS_DIR_NAME == "my_repos"
+        assert "/tmp/test" in config.REPOS_DIR
+        assert "my_repos" in config.REPOS_DIR
 
-    def test_default_llm_generation_parameters(self):
-        """Test default LLM generation parameters."""
+    def test_db_path_property(self):
+        """Test the DB_PATH property."""
+        config = AppConfig()
+        # DB_PATH now returns full path: data/pipeline.db
+        assert "pipeline.db" in config.DB_PATH
+        assert config.DB_PATH == "data/pipeline.db"
+
+    def test_get_section_config(self):
+        """Test getting configuration for a specific section."""
         config = AppConfig()
 
-        assert config.DEFAULT_MAX_TOKENS == 500
-        assert config.DEFAULT_TEMPERATURE == 0.7
+        llm_config = config.get_section_config("llm")
+        assert "llm_base_url" in llm_config
+        assert "llm_model_name" in llm_config
+        assert llm_config["llm_base_url"] == "http://localhost:11434"
 
-    def test_default_battery_management_settings(self):
-        """Test default battery management settings."""
+        pipeline_config = config.get_section_config("pipeline")
+        assert "base_dir" in pipeline_config
+        assert "data_dir" in pipeline_config
+
+    def test_get_section_config_invalid(self):
+        """Test getting config for an invalid section."""
+        config = AppConfig()
+        with pytest.raises(ValueError, match="Unknown section"):
+            config.get_section_config("invalid_section")
+
+    def test_yaml_overrides(self, mock_config_loader):
+        """Test that YAML settings override defaults."""
+        mock_config_loader.load.return_value = {
+            "llm": {"base_url": "http://remote-server:8080", "max_retries": 10},
+            "pipeline": {"base_dir": "/custom/path"},
+        }
+
         config = AppConfig()
 
-        assert config.BATTERY_LOW_THRESHOLD == 15
-        assert config.BATTERY_HIGH_THRESHOLD == 90
-        assert config.BATTERY_CHECK_INTERVAL == 60
+        assert config.LLM_BASE_URL == "http://remote-server:8080"
+        assert config.LLM_MAX_RETRIES == 10
+        assert config.BASE_DIR == "/custom/path"
 
-    def test_excluded_file_extensions(self):
-        """Test that excluded file extensions are properly configured."""
+    def test_allowed_extensions_tuple_conversion(self, mock_config_loader):
+        """Test that allowed_extensions is converted to tuple from list in YAML."""
+        mock_config_loader.load.return_value = {"filtering": {"allowed_extensions": [".py", ".js", ".ts"]}}
+
         config = AppConfig()
 
-        expected_extensions = (
-            ".png", ".jpg", ".jpeg", ".gif", ".bin", ".zip", ".tar", ".gz",
-            ".svg", ".idx", ".rev", ".pack", ".DS_Store", ".pdf", ".pptx"
-        )
+        assert isinstance(config.ALLOWED_EXTENSIONS, tuple)
+        assert ".py" in config.ALLOWED_EXTENSIONS
+        assert ".js" in config.ALLOWED_EXTENSIONS
+        assert ".ts" in config.ALLOWED_EXTENSIONS
 
-        assert config.EXCLUDED_FILE_EXTENSIONS == expected_extensions
-        assert ".png" in config.EXCLUDED_FILE_EXTENSIONS
-        assert ".pdf" in config.EXCLUDED_FILE_EXTENSIONS
-        assert ".pptx" in config.EXCLUDED_FILE_EXTENSIONS
-
-    def test_chat_templates_defined(self):
-        """Test that all chat templates are defined."""
-        config = AppConfig()
-
-        assert hasattr(config, 'QWEN_TEMPLATE')
-        assert hasattr(config, 'LLAMA3_CHAT_TEMPLATE')
-        assert hasattr(config, 'MISTRAL_CHAT_TEMPLATE')
-        assert hasattr(config, 'GEMMA_CHAT_TEMPLATE')
-
-        assert "<|im_start|>" in config.QWEN_TEMPLATE
-        assert "<|begin_of_text|>" in config.LLAMA3_CHAT_TEMPLATE
-        assert "[INST]" in config.MISTRAL_CHAT_TEMPLATE
-        assert "<start_of_turn>" in config.GEMMA_CHAT_TEMPLATE
-
-    def test_state_management_settings(self):
-        """Test state management configuration."""
-        config = AppConfig()
-
-        assert config.STATE_SAVE_INTERVAL == 10
-
-    def test_parallel_processing_settings(self):
-        """Test parallel processing configuration."""
-        config = AppConfig()
-
-        assert config.MAX_CONCURRENT_FILES == 1
-        assert config.FILE_BATCH_SIZE == 10
-
-    def test_performance_and_cache_settings(self):
-        """Test performance and cache configuration."""
-        config = AppConfig()
-
-        assert config.FILE_HASH_CACHE_SIZE == 10000
-        assert config.DATABASE_CONNECTION_POOL_SIZE == 5
-        assert config.LLM_REQUEST_TIMEOUT == 300
-        assert config.CHUNK_READ_SIZE == 8192
-
-    @patch('platform.machine')
-    @patch('platform.system')
-    def test_use_mlx_on_apple_silicon(self, mock_system, mock_machine):
-        """Test that USE_MLX is True on Apple Silicon."""
+    @patch("platform.machine")
+    @patch("platform.system")
+    def test_backend_detection_apple_silicon(self, mock_system, mock_machine):
+        """Test that MLX is detected on Apple Silicon."""
         mock_system.return_value = "Darwin"
         mock_machine.return_value = "arm64"
 
         config = AppConfig()
 
-        # Note: The actual config has USE_MLX hardcoded to False
-        # This test verifies the detection logic would work if enabled
-        assert mock_system.called
-        assert mock_machine.called
+        # Check if detected as Apple Silicon
+        assert config._is_apple_silicon() is True
 
-    @patch('platform.machine')
-    @patch('platform.system')
+    @patch("platform.machine")
+    @patch("platform.system")
     def test_use_mlx_on_non_apple_silicon(self, mock_system, mock_machine):
         """Test that USE_MLX detection works on non-Apple Silicon."""
         mock_system.return_value = "Linux"
@@ -124,116 +117,40 @@ class TestAppConfig:
 
         config = AppConfig()
 
-        # The current config has USE_MLX hardcoded to False
-        assert config.USE_MLX == False
+        # Should default to llama_cpp (USE_MLX = False)
+        assert config.USE_MLX is False
 
     def test_mlx_configuration_attributes(self):
         """Test MLX-specific configuration attributes."""
         config = AppConfig()
 
-        assert hasattr(config, 'USE_MLX')
-        assert hasattr(config, 'MLX_MODEL_NAME')
-        assert hasattr(config, 'MLX_MAX_RAM_GB')
-        assert hasattr(config, 'MLX_QUANTIZE')
-        assert hasattr(config, 'MLX_TEMPERATURE')
+        assert hasattr(config, "USE_MLX")
+        assert hasattr(config, "MLX_MODEL_NAME")
+        assert hasattr(config, "MLX_MAX_RAM_GB")
+        assert hasattr(config, "MLX_QUANTIZE")
+        assert hasattr(config, "MLX_TEMPERATURE")
 
+        # The current default in src/config.py
         assert config.MLX_MODEL_NAME == "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
-        assert config.MLX_MAX_RAM_GB == 32
-        assert config.MLX_QUANTIZE == True
-        assert config.MLX_TEMPERATURE == 0.7
 
-    def test_repos_dir_property(self):
-        """Test REPOS_DIR property correctly combines BASE_DIR and REPOS_DIR_NAME."""
-        config = AppConfig()
+    def test_mlx_ram_calculation(self, mock_config_loader):
+        """Test automatic MLX RAM calculation (80% of total)."""
+        # Provide MLX config without max_ram_gb to trigger calculation
+        mock_config_loader.load.return_value = {
+            "llm": {"backend": "mlx"},
+            "mlx": {}  # Empty MLX config triggers auto-calculation
+        }
 
-        expected_path = os.path.join(config.BASE_DIR, config.REPOS_DIR_NAME)
-        assert config.REPOS_DIR == expected_path
+        with patch("psutil.virtual_memory") as mock_vmem, \
+             patch("platform.machine", return_value="arm64"), \
+             patch("platform.system", return_value="Darwin"):
+            # Mock 16GB total RAM
+            mock_vmem.return_value.total = 16 * 1024 * 1024 * 1024
 
-    def test_repos_dir_property_with_custom_base_dir(self):
-        """Test REPOS_DIR property with custom BASE_DIR."""
-        config = AppConfig()
-        config.BASE_DIR = "/custom/path"
+            config = AppConfig()
 
-        expected_path = os.path.join("/custom/path", config.REPOS_DIR_NAME)
-        assert config.REPOS_DIR == expected_path
-
-    def test_db_path_property(self):
-        """Test DB_PATH property returns correct database path."""
-        config = AppConfig()
-
-        assert config.DB_PATH == "pipeline.db"
-
-    def test_config_is_singleton_like(self):
-        """Test that multiple AppConfig instances have same class attributes."""
-        config1 = AppConfig()
-        config2 = AppConfig()
-
-        # Class attributes should be the same
-        assert config1.LLM_BASE_URL == config2.LLM_BASE_URL
-        assert config1.LLM_MODEL_NAME == config2.LLM_MODEL_NAME
-        assert config1.MAX_FILE_SIZE == config2.MAX_FILE_SIZE
-
-    def test_instance_attributes_separate(self):
-        """Test that instance attributes (MLX settings) are separate per instance."""
-        config1 = AppConfig()
-        config2 = AppConfig()
-
-        # Modify one instance
-        config1.USE_MLX = True
-
-        # Other instance should still have original value
-        assert config2.USE_MLX == False
-
-    def test_chat_template_has_placeholders(self):
-        """Test that chat templates contain expected placeholders."""
-        config = AppConfig()
-
-        assert "{instruction}" in config.QWEN_TEMPLATE
-        assert "{output}" in config.QWEN_TEMPLATE
-
-        assert "{system_content}" in config.LLAMA3_CHAT_TEMPLATE
-        assert "{user_content}" in config.LLAMA3_CHAT_TEMPLATE
-        assert "{assistant_content}" in config.LLAMA3_CHAT_TEMPLATE
-
-        assert "{system_and_user_content}" in config.MISTRAL_CHAT_TEMPLATE
-        assert "{assistant_content}" in config.MISTRAL_CHAT_TEMPLATE
-
-        assert "{user_content}" in config.GEMMA_CHAT_TEMPLATE
-        assert "{assistant_content}" in config.GEMMA_CHAT_TEMPLATE
-
-    def test_numeric_settings_are_positive(self):
-        """Test that all numeric settings have positive values."""
-        config = AppConfig()
-
-        assert config.LLM_MAX_RETRIES > 0
-        assert config.LLM_RETRY_DELAY > 0
-        assert config.LLM_MODEL_CACHE_TTL > 0
-        assert config.MAX_FILE_SIZE > 0
-        assert config.MAX_LOG_FILES > 0
-        assert config.DEFAULT_MAX_TOKENS > 0
-        assert config.DEFAULT_TEMPERATURE > 0
-        assert config.BATTERY_LOW_THRESHOLD > 0
-        assert config.BATTERY_HIGH_THRESHOLD > 0
-        assert config.BATTERY_CHECK_INTERVAL > 0
-        assert config.STATE_SAVE_INTERVAL > 0
-        assert config.MAX_CONCURRENT_FILES > 0
-        assert config.FILE_BATCH_SIZE > 0
-        assert config.FILE_HASH_CACHE_SIZE > 0
-        assert config.DATABASE_CONNECTION_POOL_SIZE > 0
-        assert config.LLM_REQUEST_TIMEOUT > 0
-        assert config.CHUNK_READ_SIZE > 0
-
-    def test_battery_thresholds_make_sense(self):
-        """Test that battery threshold values are logical."""
-        config = AppConfig()
-
-        assert 0 < config.BATTERY_LOW_THRESHOLD < 100
-        assert 0 < config.BATTERY_HIGH_THRESHOLD < 100
-        assert config.BATTERY_LOW_THRESHOLD < config.BATTERY_HIGH_THRESHOLD
-
-    def test_temperature_in_valid_range(self):
-        """Test that temperature values are in valid range."""
-        config = AppConfig()
-
-        assert 0 <= config.DEFAULT_TEMPERATURE <= 2.0
-        assert 0 <= config.MLX_TEMPERATURE <= 2.0
+            # 80% of 16GB is 12.8GB, int is 12
+            expected_limit = 12
+            assert config.MLX_MAX_RAM_GB == expected_limit
+            assert config.MLX_QUANTIZE is True
+            assert config.MLX_TEMPERATURE == 0.7

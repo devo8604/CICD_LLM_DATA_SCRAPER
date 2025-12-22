@@ -1,419 +1,278 @@
 # LLM Data Pipeline
 
-An automated pipeline for generating high-quality question-and-answer training data from Git repositories. This tool processes source code files and uses Large Language Models to create Q&A pairs suitable for fine-tuning code-focused LLMs.
+A comprehensive pipeline for scraping Git repositories, processing code files, and generating Question-Answer (Q&A) pairs for Fine-tuning Large Language Models (LLMs). Features a Terminal User Interface (TUI), native Apple Silicon (MLX) support, configurable token limits, and robust error handling.
 
-## Table of Contents
+## 📋 Table of Contents
 
-- [Features](#features)
-- [Quick Start](#quick-start)
-  - [Installation](#installation)
-  - [Basic Usage](#basic-usage)
-- [Configuration](#configuration)
-  - [Option 1: llama.cpp (Recommended)](#option-1-llamacpp-recommended-for-most-users)
-  - [Option 2: MLX (Apple Silicon)](#option-2-mlx-apple-silicon-only)
-  - [MLX Model Management](#mlx-model-management)
-- [Commands](#commands)
-  - [scrape - Clone/Update Repositories](#scrape---cloneupdate-repositories)
-  - [prepare - Generate Q&A Pairs](#prepare---generate-qa-pairs)
-  - [retry - Retry Failed Files](#retry---retry-failed-files)
-  - [export - Export Training Data](#export---export-training-data)
-- [Directory Structure](#directory-structure)
-- [Database Schema](#database-schema)
-  - [TrainingSamples](#trainingsamples)
-  - [ConversationTurns](#conversationturns)
-  - [FileHashes](#filehashes)
-  - [FailedFiles](#failedfiles)
-- [Troubleshooting](#troubleshooting)
-  - [MLX Issues (Apple Silicon)](#mlx-issues-apple-silicon)
-  - [llama.cpp Issues](#llamacpp-issues)
-  - [General Issues](#general-issues)
-- [Performance Tips](#performance-tips)
-- [File Exclusions](#file-exclusions)
-- [Examples](#examples)
-  - [Process a Specific Repository](#process-a-specific-repository)
-  - [Resume After Interruption](#resume-after-interruption)
-  - [Retry Failed Files](#retry-failed-files-1)
-- [License](#license)
-- [Contributing](#contributing)
-- [Support](#support)
+- [Features](#-features)
+- [Installation](#-installation)
+- [Quickstart](#-quickstart)
+- [Usage](#-usage)
+  - [Terminal UI (TUI)](#terminal-ui-tui)
+  - [Command Line Interface (CLI)](#command-line-interface-cli)
+- [Configuration](#%EF%%8F-configuration)
+- [MLX Support (Apple Silicon)](#-mlx-support-apple-silicon)
+- [Development](#-development)
+- [License](#-license)
 
-## Features
+## ✨ Features
 
-- 🔄 **Automated Repository Management**: Clone and update Git repositories from a simple text file
-- 🤖 **Intelligent Q&A Generation**: Uses LLMs to generate contextual questions and answers from code
-- 💾 **Smart Caching**: Tracks file hashes to avoid reprocessing unchanged files
-- 🔁 **Resume Support**: Automatically resumes from where it left off if interrupted
-- 🍎 **MLX Support**: Native Apple Silicon acceleration (M1/M2/M3 Macs)
-- 🦙 **llama.cpp Compatible**: Works with any OpenAI-compatible API endpoint
-- 📊 **Multiple Export Formats**: CSV, Alpaca, ChatML, Llama3, Mistral, Gemma formats
-- 🔋 **Battery Management**: Automatically pauses on low battery (macOS)
-- 🗃️ **SQLite Storage**: All data stored in a portable SQLite database
+- **Repository Scraping**: efficient cloning and updating of Git repositories from a list.
+- **Intelligent Processing**:
+  - Filters files by extension and size.
+  - Generates Q&A pairs using local LLMs with examples and detailed explanations.
+  - Supports **llama.cpp** servers and native **MLX** models.
+  - **Optimized token capability** with 4,096 default tokens for optimal performance/detail balance and virtually unlimited processing capability.
+  - **Smart large file processing** with intelligent chunking to handle files larger than context window.
+- **Interactive TUI**:
+  - Real-time dashboard with battery, disk, and memory monitoring.
+  - Progress tracking for scraping and processing with file size information.
+  - Interactive configuration editor.
+  - **Fuzzy-searchable Command Palette** (`C` key).
+- **Customizable Prompts**:
+  - Theme-based prompts (e.g., `devops`, `scientific`) that encourage examples.
+  - Hot-reload support without restarting.
+- **Robustness**:
+  - Automated retry mechanisms with exponential backoff.
+  - Circuit breakers for API stability.
+  - State management to resume interrupted jobs.
+  - MLX timeout handling and parameter compatibility fixes.
+- **Exporting**:
+  - Export datasets to JSONL (Alpaca/ChatML formats), CSV, or Parquet.
+- **Performance**:
+  - Multiprocessing support.
+  - Apple Silicon GPU acceleration via MLX.
+  - Optimized caching with increased cache size (256 entries).
+  - Improved tokenization and file processing efficiency.
 
-## Quick Start
+## 📦 Installation
 
-### Installation
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/yourusername/cicdllm.git
+    cd cicdllm
+    ```
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd cicdllm
-   ```
+2.  **Create and activate a virtual environment**:
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
 
-2. **Create and activate virtual environment**:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+3.  **Install the package** (recommended - using pyproject.toml):
+    ```bash
+    # Basic installation (core dependencies only)
+    pip install -e .
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+    # With MLX support for Apple Silicon (M1/M2/M3/M4)
+    pip install -e ".[mlx]"
 
-### Basic Usage
+    # With development tools (pytest, ruff, etc.)
+    pip install -e ".[dev]"
 
-1. **Create a `repos.txt` file** with Git repository URLs (one per line):
-   ```
-   https://github.com/user/repo1
-   https://github.com/user/repo2
-   ```
+    # Everything (all optional dependencies)
+    pip install -e ".[all]"
+    ```
 
-2. **Configure your LLM backend** (see [Configuration](#configuration))
+    **Alternative** (legacy - using requirements.txt):
+    ```bash
+    pip install -r requirements.txt           # Core dependencies
+    pip install -r requirements-dev.txt       # Development tools
+    ```
 
-3. **Clone repositories**:
-   ```bash
-   python3 main.py scrape
-   ```
+    > **Note**: MLX dependencies are automatically filtered to macOS only. On other platforms, they will be skipped.
 
-4. **Generate Q&A pairs**:
-   ```bash
-   python3 main.py prepare
-   ```
+## 🚀 Quickstart
 
-5. **Export training data**:
-   ```bash
-   python3 main.py export --template alpaca-jsonl --output-file training_data.jsonl
-   ```
-
-## Configuration
-
-The pipeline supports two LLM backends:
-
-### Option 1: llama.cpp (Recommended for most users)
-
-Edit `src/config.py`:
-
-```python
-# LLM Client Settings
-USE_MLX = False  # Use llama.cpp
-LLM_BASE_URL = "http://localhost:11454"  # Your llama.cpp server
-LLM_MODEL_NAME = "your-model-name"
-```
-
-Start your llama.cpp server:
-```bash
-# Example with llama-server
-llama-server -m path/to/model.gguf --port 11454
-```
-
-### Option 2: MLX (Apple Silicon only)
-
-For M1/M2/M3 Macs with native acceleration:
+The easiest way to get started is using the interactive wizard:
 
 ```bash
-# Install MLX dependencies
-pip install mlx mlx-lm
+python3 main.py quickstart
 ```
 
-Edit `src/config.py`:
-```python
-USE_MLX = True  # Enable MLX
-MLX_MODEL_NAME = "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
-```
+This wizard will guide you through:
+1.  Setting up your `repos.txt` list.
+2.  Choosing your LLM backend (llama.cpp or MLX).
+3.  Testing connectivity.
 
-#### MLX Model Management
+## 💻 Usage
+
+### Terminal UI (TUI)
+
+Launch the interactive dashboard:
 
 ```bash
-# List locally cached models
-python3 main.py mlx list
-
-# Download a model
-python3 main.py mlx download mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
-
-# Get model information
-python3 main.py mlx info mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
-
-# Remove a model
-python3 main.py mlx remove mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
+python3 main.py tui
 ```
 
-## Commands
+**Key Bindings:**
+- `S`: **Scrape** repositories.
+- `P`: **Prepare** data (process files).
+- `G`: **Config** menu (edit settings).
+- `R`: **Refresh** stats.
+- `Q` / `Esc`: **Quit**.
 
-### `scrape` - Clone/Update Repositories
+### Command Line Interface (CLI)
 
+You can also run individual steps via the CLI.
+
+**1. Scrape Repositories**
+Clone or update repositories listed in `repos.txt`:
 ```bash
-python3 main.py scrape [OPTIONS]
-```
-
-Clones or updates all repositories listed in `repos.txt`.
-
-**Options:**
-- `--data-dir`: Directory for data storage (default: `data`)
-- `--max-log-files`: Maximum log files to keep (default: 5)
-
-### `prepare` - Generate Q&A Pairs
-
-```bash
-python3 main.py prepare [OPTIONS]
-```
-
-Processes files and generates question-answer pairs.
-
-**Options:**
-- `--max-tokens`: Maximum tokens for LLM responses (default: 500)
-- `--temperature`: Sampling temperature 0.0-2.0 (default: 0.7)
-- `--max-file-size`: Maximum file size in bytes (default: 5MB)
-- `--data-dir`: Directory for data storage
-- `--max-log-files`: Maximum log files to keep
-
-**Features:**
-- ✅ Skips unchanged files (uses SHA256 hashing)
-- ✅ Automatically resumes from interruption
-- ✅ Tracks failed files for retry
-- ✅ Excludes binary files, images, and large files
-- ✅ Progress bars for repositories and files
-
-### `retry` - Retry Failed Files
-
-```bash
-python3 main.py retry [OPTIONS]
-```
-
-Attempts to reprocess files that failed during `prepare`.
-
-### `export` - Export Training Data
-
-```bash
-python3 main.py export --template <FORMAT> --output-file <PATH>
-```
-
-**Required Arguments:**
-- `--template`: Output format (see below)
-- `--output-file`: Path to output file
-
-**Supported Formats:**
-- `csv` - Comma-separated values
-- `alpaca-jsonl` - Alpaca instruction format (JSONL)
-- `chatml-jsonl` - ChatML format (JSONL)
-- `llama3` - Llama 3 chat template
-- `mistral` - Mistral instruction format
-- `gemma` - Gemma chat template
-
-**Example:**
-```bash
-python3 main.py export --template alpaca-jsonl --output-file output.jsonl
-```
-
-## Directory Structure
-
-```
-cicdllm/
-├── data/
-│   └── pipeline.db          # SQLite database with Q&A pairs
-├── logs/                    # Log files (rotated)
-├── repos/                   # Cloned repositories
-│   └── <org>/
-│       └── <repo>/
-├── src/                     # Source code
-│   ├── services/           # Service layer
-│   ├── config.py           # Configuration
-│   ├── data_pipeline.py    # Main pipeline
-│   ├── db_manager.py       # Database operations
-│   ├── llm_client.py       # LLM API client
-│   ├── mlx_client.py       # MLX client (Apple Silicon)
-│   └── ...
-├── tests/                   # Unit tests
-├── main.py                  # Entry point
-├── repos.txt               # Repository URLs
-└── requirements.txt        # Python dependencies
-```
-
-## Database Schema
-
-The pipeline uses SQLite to store all generated data:
-
-### TrainingSamples
-
-Stores Q&A sample metadata.
-
-| Column                 | Type        | Description                    |
-| ---------------------- | ----------- | ------------------------------ |
-| `sample_id`            | `INTEGER`   | Primary key                    |
-| `dataset_source`       | `VARCHAR`   | Source file path               |
-| `creation_date`        | `TIMESTAMP` | When created                   |
-| `model_type_intended`  | `VARCHAR`   | Intended model type            |
-| `sample_quality_score` | `REAL`      | Quality score                  |
-| `is_multiturn`         | `BOOLEAN`   | Multi-turn conversation flag   |
-
-### ConversationTurns
-
-Stores individual Q&A turns.
-
-| Column          | Type      | Description                     |
-| --------------- | --------- | ------------------------------- |
-| `turn_id`       | `INTEGER` | Primary key                     |
-| `sample_id`     | `INTEGER` | Foreign key to TrainingSamples  |
-| `turn_index`    | `INTEGER` | Turn order                      |
-| `role`          | `VARCHAR` | 'user' or 'assistant'           |
-| `content`       | `TEXT`    | Question or answer text         |
-| `is_label`      | `BOOLEAN` | Label flag                      |
-| `metadata_json` | `TEXT`    | Additional metadata (JSON)      |
-
-### FileHashes
-
-Tracks processed files to avoid reprocessing.
-
-| Column           | Type       | Description                 |
-| ---------------- | ---------- | --------------------------- |
-| `file_path`      | `TEXT`     | Primary key, file path      |
-| `content_hash`   | `TEXT`     | SHA256 hash                 |
-| `last_processed` | `DATETIME` | Last processing time        |
-| `sample_id`      | `INTEGER`  | Foreign key to TrainingSamples |
-
-### FailedFiles
-
-Stores failed file information for retry.
-
-| Column      | Type        | Description         |
-| ----------- | ----------- | ------------------- |
-| `failed_id` | `INTEGER`   | Primary key         |
-| `file_path` | `TEXT`      | Failed file path    |
-| `reason`    | `TEXT`      | Failure reason      |
-| `failed_at` | `TIMESTAMP` | Failure timestamp   |
-
-## Troubleshooting
-
-### MLX Issues (Apple Silicon)
-
-**Memory Errors:**
-```
-[METAL] Command buffer execution failed: Insufficient Memory
-```
-
-**Solutions:**
-- Use smaller models (e.g., 7B instead of 30B parameters)
-- Close other memory-intensive applications
-- Recommended models by RAM:
-  - 8GB: 1B-3B parameter models
-  - 16GB: 3B-7B parameter models
-  - 24GB+: 7B-14B parameter models
-  - 32GB+: 14B+ parameter models
-
-**Model Loading Failures:**
-- Verify internet connectivity
-- Check model name is correct
-- Try a different model from MLX Community
-
-### llama.cpp Issues
-
-**Connection Refused:**
-```bash
-# Verify server is running
-curl http://localhost:11454/v1/models
-
-# Check port matches config
-# src/config.py: LLM_BASE_URL = "http://localhost:11454"
-```
-
-**Model Not Found:**
-- Ensure model is loaded in llama.cpp
-- Check `LLM_MODEL_NAME` matches exactly
-- List available models: `curl http://localhost:11454/v1/models`
-
-### General Issues
-
-**Empty Q&A Pairs:**
-- Check LLM is responding correctly
-- Increase `--max-tokens` if answers are truncated
-- Adjust `--temperature` for better variety
-
-**Processing Stuck:**
-- Check logs in `logs/` directory
-- Verify LLM server is responding
-- Use `Ctrl+C` to interrupt (state is saved automatically)
-
-**Database Locked:**
-- Ensure only one pipeline instance is running
-- Close any SQLite browser connections
-
-## Performance Tips
-
-1. **File Size Limits**: Adjust `MAX_FILE_SIZE` in config for your needs
-2. **Concurrent Processing**: Set `MAX_CONCURRENT_FILES` > 1 for parallel processing
-3. **Batch Size**: Adjust `FILE_BATCH_SIZE` for optimal throughput
-4. **LLM Timeouts**: Increase `LLM_REQUEST_TIMEOUT` for slower models
-5. **Battery Management**: On macOS, pipeline pauses when battery < 15%
-
-## File Exclusions
-
-The following file types are automatically excluded:
-
-- Images: `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`
-- Archives: `.zip`, `.tar`, `.gz`
-- Binary: `.bin`, `.pack`, `.idx`, `.rev`
-- Documents: `.pdf`, `.pptx`
-- System: `.DS_Store`
-
-Configure in `src/config.py`:
-```python
-EXCLUDED_FILE_EXTENSIONS = (
-    ".png", ".jpg", # ... add more
-)
-```
-
-## Examples
-
-### Process a Specific Repository
-
-```bash
-# Create repos.txt with one repository
-echo "https://github.com/user/awesome-project" > repos.txt
-
-# Scrape and process
 python3 main.py scrape
-python3 main.py prepare --max-tokens 1000 --temperature 0.8
-
-# Export to Alpaca format
-python3 main.py export --template alpaca-jsonl --output-file alpaca_data.jsonl
 ```
 
-### Resume After Interruption
+**2. Prepare Data (Generate Q&A)**
+Process files and generate dataset entries:
+```bash
+python3 main.py prepare
+```
 
-The pipeline automatically saves state. Simply run the command again:
+**3. Export Data**
+Export the processed data to a file:
+```bash
+# Export to Alpaca JSONL format
+python3 main.py export --template alpaca-jsonl --output-file data.jsonl
+
+# Export to CSV
+python3 main.py export --template csv --output-file data.csv
+```
+
+**4. View Status**
+See pipeline statistics:
+```bash
+python3 main.py status
+# Or real-time view
+python3 main.py status-realtime
+```
+
+**5. Retry Failed Files**
+Retry processing for files that failed previously:
+```bash
+python3 main.py retry
+```
+
+## 🛠️ Configuration
+
+The pipeline is configured via `cicdllm.yaml`. You can edit this file directly or use the TUI (`python3 main.py tui` -> `G`).
+
+**Key Settings:**
+```yaml
+llm:
+  # Backend selection: 'mlx' (Apple Silicon) or 'llama_cpp' (Standard)
+  backend: mlx  
+  
+  # For llama_cpp backend:
+  base_url: http://localhost:11434
+  model_name: ollama/llama3.2:3b
+  
+  # For MLX backend:
+  mlx_model_name: mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
+  mlx_quantize: true
+
+pipeline:
+  data_dir: data
+  repos_dir_name: repos
+```
+
+Manage config via CLI:
+```bash
+# Show current config
+python3 main.py config show
+
+# Set a value
+python3 main.py config set llm.max_retries 5
+```
+
+## 🖥️ TUI Dashboard
+
+Launch the interactive dashboard to monitor your pipeline:
 
 ```bash
-# If interrupted during prepare
-python3 main.py prepare  # Resumes from last position
+python3 main.py tui
 ```
 
-### Retry Failed Files
+**New Features:**
+- **Backend Visualization:** clearly displays active model and backend (MLX/Llama.cpp).
+- **Deferred Loading:** MLX models only load when processing starts, saving memory.
+- **Simplified Stats:** clean, two-column layout for pipeline statistics.
+- **Real-time Monitoring:** tracks battery, disk, memory, and processing rates.
 
+**Key Bindings:**
+- `S`: **Scrape** repositories.
+- `P`: **Prepare** data (process files).
+- `G`: **Config** menu (edit settings).
+- `R`: **Refresh** stats.
+- `Q` / `Esc`: **Quit**.
+
+## 🍎 MLX Support (Apple Silicon)
+
+This project has first-class support for Apple Silicon via the MLX framework.
+
+**Manage Models:**
 ```bash
-# After prepare completes
-python3 main.py retry  # Reprocesses all failed files
+# Download a model
+python3 main.py mlx download mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+
+# List local models
+python3 main.py mlx list
 ```
 
-## License
+**Configuration:**
+Set `llm.backend` to `mlx` in your config to enable native GPU acceleration.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 💻 Development
 
-## Contributing
+**Running Tests:**
+```bash
+pytest
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
+**Linting & Formatting:**
+```bash
+ruff check .
+ruff format .
+```
 
-## Support
+**Security Scanning:**
+```bash
+# Static analysis with Semgrep
+semgrep scan --config=auto .
 
-For issues and questions:
-- Check the [Troubleshooting](#troubleshooting) section
-- Review logs in the `logs/` directory
-- Open an issue on GitHub
+# Dependency vulnerability scanning
+pip-audit --desc on
+```
+
+**Project Structure:**
+- `src/core/`: Core functionality (configuration, error handling, logging, protocols, utilities)
+- `src/data/`: Data management (database, file operations, state management)
+- `src/llm/`: LLM-related code (clients, prompt management, MLX integration)
+- `src/pipeline/`: Pipeline orchestration (services, CLI, exporters, preflight checks)
+- `src/ui/`: User interface components (TUI, widgets, progress tracking)
+- `src/utils/`: Utility functions (memory management, patches, resets, status utilities)
+- `tests/`: Unit tests.
+- `data/`: Database and state files.
+- `repos/`: Cloned repositories.
+
+**Security Best Practices:**
+- Input validation and path sanitization
+- Proper resource management with cleanup
+- Multi-encoding detection for file processing
+- Timeout protection for network operations
+- Concurrency safety with thread-local connections
+- Regular dependency updates and vulnerability scanning
+
+**Performance Optimizations:**
+- Pre-tokenization for efficient LLM communication
+- Context window validation before API calls
+- Smart content truncation based on actual tokenization
+- Resilient connection handling with exception-based error recovery
+- Caching of tokenization results for repeated operations
+- Batch processing with optimal chunk sizes
+- Pydantic-based configuration with strict validation
+
+For more detailed security information, see [SECURITY.md](SECURITY.md).
+
+## 📄 License
+
+[MIT License](LICENSE)

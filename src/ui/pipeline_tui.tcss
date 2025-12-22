@@ -1,0 +1,492 @@
+/* Textual Styles for the LLM Data Pipeline TUI with Nord Theme */
+
+/* Nord color palette */
+$nf-text: #ECEFF4;
+$nf-bg: #2E3440;
+$nf-panel: #3B4252;
+$nf-border: #4C566A;
+$nf-accent: #88C0D0;
+$nf-success: #A3BE8C;
+$nf-warning: #EBCB8B;
+$nf-danger: #BF616A;
+$nf-info: #81A1C1;
+
+/* Main layout */
+Screen {
+    background: $nf-bg;
+    color: $nf-text;
+}
+
+#main-container {
+    layout: grid;
+    grid-size: 2 3;
+    grid-gutter: 1 1;
+    grid-rows: 1fr 1.2fr 1fr;  /* Increased space for middle panel */
+    grid-columns: 2fr 3fr;
+    height: 1fr;
+    padding: 1;
+    min-width: 60;
+    min-height: 30;
+}
+
+/* Responsive layout for narrow screens (applied via Python) */
+#main-container.narrow-mode {
+    grid-size: 1 4;
+    grid-columns: 1fr;
+    grid-rows: auto auto auto 2fr;
+    grid-gutter: 0 1;
+}
+
+#main-container.narrow-mode #progress-panel {
+    layout: vertical;
+    height: auto;
+}
+
+#main-container.narrow-mode #progress-text-col,
+#main-container.narrow-mode #progress-visual-col {
+    width: 100%;
+    border: none;
+}
+
+#main-container.narrow-mode #system-panel,
+#main-container.narrow-mode #status-panel,
+#main-container.narrow-mode #progress-panel,
+#main-container.narrow-mode #log-panel {
+    column-span: 1;
+    row-span: 1;
+}
+
+#main-container.narrow-mode #log-panel {
+    min-height: 15;
+}
+
+/* Dashboard title */
+.title {
+    text-style: bold;
+    content-align: center middle;
+    column-span: 2;
+    height: auto;  /* Changed from fixed height to auto */
+    background: $nf-panel;
+    color: $nf-accent;
+    text-style: bold;
+    border: solid $nf-border;
+    display: block;
+    text-align: center;
+    padding: 1 0;
+    text-align: center;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+
+/* Panel styling */
+.panel {
+    background: $nf-panel;
+    border: solid $nf-border;
+    padding: 1;
+    height: 100%;
+    width: 100%;
+    min-height: 6;  /* Minimum height for very small panels */
+}
+
+
+.panel-title {
+    text-style: bold;
+    color: $nf-accent;
+    margin-bottom: 1;
+    text-align: center;
+}
+
+/* System monitoring widgets */
+.MemoryWidget, .SwapWidget, .GPUWidget {
+    height: auto;
+    padding: 0 0;
+    margin: 0 0;
+    background: $nf-bg;
+    color: $nf-text;
+    border: none;
+}
+
+/* Progress bars for system resources */
+.ProgressBar--memory {
+    background: $nf-bg;
+    color: $nf-success;
+}
+
+.ProgressBar--memory > .bar {
+    background: $nf-success;
+}
+
+.ProgressBar--swap {
+    background: $nf-bg;
+    color: $nf-warning;
+}
+
+.ProgressBar--swap > .bar {
+    background: $nf-warning;
+}
+
+.ProgressBar--gpu {
+    background: $nf-bg;
+    color: $nf-accent;
+}
+
+.ProgressBar--gpu > .bar {
+    background: $nf-accent;
+}
+
+/* Panel spans */
+#system-panel {
+    row-span: 1;
+    column-span: 1;
+}
+
+#status-panel {
+    row-span: 1;
+    column-span: 1;
+}
+
+#progress-panel {
+    row-span: 1;
+    column-span: 2;
+    layout: horizontal;
+    padding: 0;
+}
+
+#progress-text-col {
+    width: 1fr;
+    border-right: tall $nf-border;
+    padding: 1;
+}
+
+#progress-visual-col {
+    width: 1fr;
+    padding: 1;
+}
+
+#log-panel {
+    row-span: 1;
+    column-span: 2;
+    height: auto;
+    min-height: 10;
+    padding: 0 1;
+}
+
+.progress-label {
+    text-style: bold;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+
+/* Status widgets */
+StatusWidget {
+    height: 1;
+    padding: 0 0;
+    margin: 0 0;
+    background: $nf-bg;
+    color: $nf-text;
+    border: none;
+}
+
+/* Enhanced progress bars */
+ProgressBar {
+    height: 1;
+    background: $nf-bg;
+    color: $nf-success;
+    border: none;
+}
+
+ProgressBar > .bar {
+    background: $nf-accent;
+    color: $nf-accent;
+}
+
+ProgressBar > .progress-bar--percentage {
+    text-style: bold;
+    color: $nf-text;
+}
+
+/* Data table */
+DataTable {
+    background: $nf-bg;
+    color: $nf-text;
+    border: solid $nf-border;
+}
+
+DataTable > .datatable--header {
+    background: $nf-border;
+    color: $nf-text;
+}
+
+DataTable > .datatable--cursor {
+    background: $nf-info;
+    color: $nf-bg;
+}
+
+/* Buttons */
+Button {
+    background: $nf-accent;
+    color: $nf-bg;
+    border: none;
+    text-style: bold;
+}
+
+Button:hover {
+    background: $nf-info;
+}
+
+Button.-active {
+    background: $nf-success;
+}
+
+/* Footer styling */
+Footer {
+    background: $nf-border;
+    color: $nf-text;
+    text-style: bold;
+}
+
+Footer > .footer--key {
+    background: $nf-accent;
+    color: $nf-bg;
+    text-style: bold;
+}
+
+Footer > .footer--highlight {
+    color: $nf-accent;
+    text-style: underline;
+}
+
+/* Scrollable content */
+ScrollableContainer {
+    background: $nf-bg;
+    color: $nf-text;
+    border: none;
+}
+
+/* Labels */
+Label {
+    color: $nf-text;
+    text-style: none;
+    background: transparent;
+}
+
+/* Configuration Screen Styles */
+.config-screen {
+    background: $nf-panel;
+    height: 100%;
+    width: 100%;
+    border: solid $nf-border;
+    padding: 1;
+    margin: 0;
+}
+
+.config-title {
+    text-align: center;
+    color: $nf-accent;
+    text-style: bold;
+    margin-bottom: 1;
+    height: auto;
+}
+
+.config-section-title {
+    color: $nf-accent;
+    text-style: bold;
+    text-align: left;
+    height: auto;
+    background: transparent;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.config-label {
+    color: $nf-text;
+    height: auto;
+    margin-bottom: 1;
+    background: transparent;
+}
+
+.config-options-container {
+    background: $nf-bg;
+    border: solid $nf-border;
+    padding: 1;
+    margin: 1 0 1 0;
+    height: 1fr;
+}
+
+.config-options {
+    height: 1fr;
+    background: transparent;
+}
+
+.config-row {
+    height: 1;
+    padding: 0 1;
+    color: $nf-text;
+    background: $nf-bg;
+}
+
+.config-row-selected {
+    height: 1;
+    padding: 0 1;
+    color: $nf-bg;
+    background: $nf-accent;
+    text-style: bold;
+}
+
+/* Specifically target Labels inside config containers */
+#config-options-container Label {
+    color: $nf-text;
+    background: $nf-bg;
+}
+
+#config-options-container .config-section-title {
+    color: $nf-accent;
+    background: $nf-bg;
+}
+
+#config-options-container .config-row {
+    color: $nf-text;
+    background: $nf-bg;
+}
+
+#config-options-container .config-row-selected {
+    color: $nf-bg;
+    background: $nf-accent;
+    text-style: bold;
+}
+
+.config-buttons {
+    layout: horizontal;
+    align-horizontal: center;
+    margin-top: 1;
+    height: auto;
+}
+
+Input {
+    background: $nf-bg;
+    color: $nf-text;
+    border: solid $nf-border;
+    padding: 0 1;
+    height: 1;
+}
+
+.config-label {
+    width: 25;
+    color: $nf-text;
+    height: 1;
+    margin-right: 1;
+}
+
+/* Command Palette Styles */
+#command-palette-container {
+    background: $nf-panel;
+    border: tall $nf-accent;
+    width: 80;
+    height: 30;
+    padding: 1;
+    align: center middle;
+}
+
+#palette-title {
+    text-align: center;
+    color: $nf-accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#palette-input {
+    margin-bottom: 1;
+    border: solid $nf-border;
+}
+
+#palette-list {
+    background: $nf-bg;
+    border: solid $nf-border;
+    height: 1fr;
+}
+
+#palette-list ListItem {
+    padding: 1;
+    border-bottom: solid $nf-border;
+}
+
+#palette-list ListItem:hover {
+    background: $nf-panel;
+}
+
+#palette-list ListItem.--highlight {
+    background: $nf-info;
+    color: $nf-bg;
+}
+
+#palette-footer {
+    text-align: center;
+    color: $nf-info;
+    margin-top: 1;
+    text-style: italic;
+}
+
+/* Success, warning, danger colors */
+.success {
+    color: $nf-success;
+}
+
+.warning {
+    color: $nf-warning;
+}
+
+.danger {
+    color: $nf-danger;
+}
+
+.info {
+    color: $nf-info;
+}
+
+/* Input Dialog Styles */
+#input-dialog-container {
+    background: $nf-panel;
+    border: solid $nf-accent;
+    padding: 1;
+    width: 60;
+    height: auto;
+}
+
+.input-dialog-title {
+    text-align: center;
+    color: $nf-accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.input-dialog-type {
+    text-align: center;
+    color: $nf-info;
+    margin-bottom: 1;
+    text-style: italic;
+}
+
+.input-dialog-buttons {
+    layout: horizontal;
+    align-horizontal: center;
+    margin-top: 1;
+    height: auto;
+    width: 100%;
+}
+
+.input-dialog-buttons Button {
+    margin: 0 1;
+}
+
+#value-input {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+.config-status {
+    text-align: center;
+    color: $nf-info;
+    width: 100%;
+}

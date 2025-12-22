@@ -1,11 +1,11 @@
 # Logs directory
-logs/
+/logs/
 
 # Data directory
-data/
+/data/
 
 # Repositories
-repos/
+/repos/
 
 # Python
 __pycache__/

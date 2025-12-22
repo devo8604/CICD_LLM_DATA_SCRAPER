@@ -1,0 +1,171 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cicdllm"
+version = "0.1.0"
+description = "A comprehensive pipeline for scraping Git repositories and generating Q&A pairs for LLM fine-tuning"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = [
+    "llm",
+    "machine-learning",
+    "data-pipeline",
+    "training-data",
+    "git-scraping",
+    "question-answering",
+    "mlx",
+    "apple-silicon"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    # Core dependencies with pinned major versions
+    "PyYAML~=6.0",
+    "httpx~=0.28.0",
+    "rich~=14.0",
+    "tqdm~=4.67",
+    "textual~=6.10",
+    "psutil~=7.1",
+    "huggingface-hub~=0.36",
+    "tokenizers~=0.22",
+    "structlog~=24.4.0",
+]
+
+[project.optional-dependencies]
+# MLX support for Apple Silicon (macOS only)
+mlx = [
+    "mlx~=0.30; sys_platform == 'darwin'",
+    "mlx-lm~=0.29; sys_platform == 'darwin'",
+]
+
+# Development dependencies
+dev = [
+    "pytest~=9.0",
+    "pytest-asyncio~=1.3",
+    "pytest-cov~=7.0",
+    "pytest-mock~=3.15",
+    "pytest-timeout~=2.4",
+    "ruff~=0.14",
+    "semgrep~=1.70",
+    "pip-audit~=2.7",
+]
+
+# All optional dependencies
+all = [
+    "cicdllm[mlx,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/cicdllm"
+Documentation = "https://github.com/yourusername/cicdllm#readme"
+Repository = "https://github.com/yourusername/cicdllm.git"
+"Issue Tracker" = "https://github.com/yourusername/cicdllm/issues"
+
+[project.scripts]
+cicdllm = "cicdllm.main:main"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml", "*.txt", "*.tcss"]
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--strict-markers",
+    "-ra",
+    "--timeout=10",
+]
+testpaths = ["tests"]
+norecursedirs = ["repos", "venv", ".git", "__pycache__", "*.egg-info"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+# Ruff configuration
+[tool.ruff]
+# Same as Black.
+line-length = 180
+
+# Assume Python 3.14.
+target-version = "py314"
+
+[tool.ruff.lint]
+# Enable pycodestyle (E) and Pyflakes (F) codes by default.
+select = ["E", "F", "I", "W", "UP"]
+ignore = []
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["A", "B", "C", "D", "E", "F", "I", "UP"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.mccabe]
+# Unlike Flake8, default to a complexity of 10.
+max-complexity = 10
+
+[tool.ruff.format]
+# Use double quotes for strings.
+quote-style = "double"
+
+# Indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"

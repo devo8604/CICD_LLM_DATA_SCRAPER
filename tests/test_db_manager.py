@@ -1,12 +1,13 @@
 """Comprehensive unit tests for the DBManager class."""
 
-import pytest
-import tempfile
 import sqlite3
+import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-from src.db_manager import DBManager
+import pytest
+
+from src.data.db_manager import DBManager
 
 
 class TestDBManagerInitialization:
@@ -45,6 +46,19 @@ class TestDBManagerInitialization:
             assert db_path.exists()
             db_manager.close_db()
 
+    def test_initialization_rejects_invalid_type(self):
+        """Test that DBManager raises TypeError for invalid db_path types."""
+        # Test with MagicMock (regression test for corrupted database files bug)
+        with pytest.raises(TypeError, match="db_path must be a str or Path"):
+            DBManager(MagicMock())
+
+        # Test with other invalid types
+        with pytest.raises(TypeError, match="db_path must be a str or Path"):
+            DBManager(123)
+
+        with pytest.raises(TypeError, match="db_path must be a str or Path"):
+            DBManager(["path", "to", "db"])
+
     def test_tables_created_on_initialization(self):
         """Test that required tables are created on initialization."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -52,13 +66,10 @@ class TestDBManagerInitialization:
             db_manager = DBManager(db_path)
 
             # Check that tables exist
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            )
-            tables = [row[0] for row in cursor.fetchall()]
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+                tables = [row[0] for row in cursor.fetchall()]
 
             assert "pipeline_state" in tables
             assert "TrainingSamples" in tables
@@ -66,7 +77,6 @@ class TestDBManagerInitialization:
             assert "FileHashes" in tables
             assert "FailedFiles" in tables
 
-            conn.close()
             db_manager.close_db()
 
 
@@ -83,7 +93,7 @@ class TestDBManagerStateManagement:
             test_state = {
                 "current_file": "test.txt",
                 "processed_count": 42,
-                "status": "running"
+                "status": "running",
             }
             db_manager.save_state(test_state)
 
@@ -134,7 +144,7 @@ class TestDBManagerStateManagement:
             test_state = {
                 "config": {"key1": "value1", "key2": 123},
                 "files": ["file1.txt", "file2.txt"],
-                "count": 5
+                "count": 5,
             }
             db_manager.save_state(test_state)
 
@@ -142,7 +152,7 @@ class TestDBManagerStateManagement:
 
             assert retrieved_state["config"] == {"key1": "value1", "key2": 123}
             assert retrieved_state["files"] == ["file1.txt", "file2.txt"]
-            assert retrieved_state["count"] == "5"  # Note: Numbers are stored as strings
+            assert retrieved_state["count"] == 5
 
             db_manager.close_db()
 
@@ -159,7 +169,7 @@ class TestDBManagerQASamples:
             sample_id = db_manager.add_qa_sample(
                 file_path="test.py",
                 question_text="What does this code do?",
-                answer_text="It processes data."
+                answer_text="It processes data.",
             )
 
             assert sample_id > 0
@@ -171,12 +181,8 @@ class TestDBManagerQASamples:
             db_path = Path(tmpdir) / "test.db"
             db_manager = DBManager(db_path)
 
-            sample_id1 = db_manager.add_qa_sample(
-                "test1.py", "Question 1?", "Answer 1"
-            )
-            sample_id2 = db_manager.add_qa_sample(
-                "test2.py", "Question 2?", "Answer 2"
-            )
+            sample_id1 = db_manager.add_qa_sample("test1.py", "Question 1?", "Answer 1")
+            sample_id2 = db_manager.add_qa_sample("test2.py", "Question 2?", "Answer 2")
 
             assert sample_id1 > 0
             assert sample_id2 > 0
@@ -190,35 +196,29 @@ class TestDBManagerQASamples:
             db_path = Path(tmpdir) / "test.db"
             db_manager = DBManager(db_path)
 
-            sample_id = db_manager.add_qa_sample(
-                "test.py",
-                "What is Python?",
-                "A programming language."
-            )
+            sample_id = db_manager.add_qa_sample("test.py", "What is Python?", "A programming language.")
 
             # Verify data in database
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT dataset_source FROM TrainingSamples WHERE sample_id = ?",
+                    (sample_id,),
+                )
+                row = cursor.fetchone()
+                assert row[0] == "repo_file:test.py"
 
-            cursor.execute(
-                "SELECT dataset_source FROM TrainingSamples WHERE sample_id = ?",
-                (sample_id,)
-            )
-            row = cursor.fetchone()
-            assert row[0] == "repo_file:test.py"
+                cursor.execute(
+                    "SELECT role, content FROM ConversationTurns WHERE sample_id = ? ORDER BY turn_index",
+                    (sample_id,),
+                )
+                turns = cursor.fetchall()
+                assert len(turns) == 2
+                assert turns[0][0] == "user"
+                assert turns[0][1] == "What is Python?"
+                assert turns[1][0] == "assistant"
+                assert turns[1][1] == "A programming language."
 
-            cursor.execute(
-                "SELECT role, content FROM ConversationTurns WHERE sample_id = ? ORDER BY turn_index",
-                (sample_id,)
-            )
-            turns = cursor.fetchall()
-            assert len(turns) == 2
-            assert turns[0][0] == "user"
-            assert turns[0][1] == "What is Python?"
-            assert turns[1][0] == "assistant"
-            assert turns[1][1] == "A programming language."
-
-            conn.close()
             db_manager.close_db()
 
 
@@ -262,18 +262,17 @@ class TestDBManagerFileHashes:
             db_manager.save_file_hash("test.py", test_hash, sample_id)
 
             # Verify in database
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT content_hash, sample_id FROM FileHashes WHERE file_path = ?",
-                ("test.py",)
-            )
-            row = cursor.fetchone()
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT content_hash, sample_id FROM FileHashes WHERE file_path = ?",
+                    ("test.py",),
+                )
+                row = cursor.fetchone()
 
-            assert row[0] == test_hash
-            assert row[1] == sample_id
+                assert row[0] == test_hash
+                assert row[1] == sample_id
 
-            conn.close()
             db_manager.close_db()
 
     def test_delete_file_hash(self):
@@ -364,25 +363,23 @@ class TestDBManagerDeleteOperations:
             db_manager.delete_samples_for_file("file1.py")
 
             # Verify file1.py samples are gone
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM TrainingSamples WHERE dataset_source LIKE ?",
+                    ("%file1.py%",),
+                )
+                count = cursor.fetchone()[0]
+                assert count == 0
 
-            cursor.execute(
-                "SELECT COUNT(*) FROM TrainingSamples WHERE dataset_source LIKE ?",
-                ("%file1.py%",)
-            )
-            count = cursor.fetchone()[0]
-            assert count == 0
+                # Verify file2.py samples still exist
+                cursor.execute(
+                    "SELECT COUNT(*) FROM TrainingSamples WHERE dataset_source LIKE ?",
+                    ("%file2.py%",),
+                )
+                count = cursor.fetchone()[0]
+                assert count == 1
 
-            # Verify file2.py samples still exist
-            cursor.execute(
-                "SELECT COUNT(*) FROM TrainingSamples WHERE dataset_source LIKE ?",
-                ("%file2.py%",)
-            )
-            count = cursor.fetchone()[0]
-            assert count == 1
-
-            conn.close()
             db_manager.close_db()
 
 
@@ -480,8 +477,8 @@ class TestDBManagerCloseDB:
             db_manager.close_db()
             db_manager.close_db()
 
-    @patch('src.db_manager.logging')
-    def test_close_db_logs_error_on_exception(self, mock_logging):
+    @patch("src.data.db_manager.logger")
+    def test_close_db_logs_error_on_exception(self, mock_logger):
         """Test that close_db logs errors but doesn't raise."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
@@ -494,7 +491,7 @@ class TestDBManagerCloseDB:
             db_manager.close_db()
 
             # Verify error was logged
-            assert mock_logging.error.called
+            assert mock_logger.error.called
 
 
 class TestDBManagerDelegation:
@@ -506,7 +503,7 @@ class TestDBManagerDelegation:
             db_path = Path(tmpdir) / "test.db"
             db_manager = DBManager(db_path)
 
-            with patch.object(db_manager.state_manager, 'get_state', return_value={"test": "value"}):
+            with patch.object(db_manager.state_manager, "get_state", return_value={"test": "value"}):
                 result = db_manager.get_state()
 
                 db_manager.state_manager.get_state.assert_called_once()
@@ -520,7 +517,7 @@ class TestDBManagerDelegation:
             db_path = Path(tmpdir) / "test.db"
             db_manager = DBManager(db_path)
 
-            with patch.object(db_manager.state_manager, 'save_state'):
+            with patch.object(db_manager.state_manager, "save_state"):
                 db_manager.save_state({"key": "value"})
 
                 db_manager.state_manager.save_state.assert_called_once_with({"key": "value"})
@@ -533,7 +530,7 @@ class TestDBManagerDelegation:
             db_path = Path(tmpdir) / "test.db"
             db_manager = DBManager(db_path)
 
-            with patch.object(db_manager.training_data_repo, 'add_qa_sample', return_value=42):
+            with patch.object(db_manager.training_data_repo, "add_qa_sample", return_value=42):
                 result = db_manager.add_qa_sample("file.py", "Q?", "A")
 
                 db_manager.training_data_repo.add_qa_sample.assert_called_once_with("file.py", "Q?", "A")

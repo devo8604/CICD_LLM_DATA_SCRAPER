@@ -1,0 +1,14 @@
+Code/Text to analyze:
+
+[The actual code/text content will be inserted here by the system]
+
+INSTRUCTIONS:
+1. Analyze the provided code/text content above
+2. Generate at most 5 high-quality, specific questions to test deep understanding of this content
+3. Focus on reverse engineering (instruction tuning) - treat the provided code as the solution and generate prompts that would ask for this specific implementation
+4. Design questions that would require detailed answers with code examples or practical implementations
+
+OUTPUT REQUIREMENTS:
+- Output ONLY the questions, one per line
+- Each question must end with a question mark "?"
+- Do not include any other text, explanations, or formatting

@@ -1,114 +1,144 @@
-#!/usr/bin/env python3.14
+#!/usr/bin/env python3
+"""
+Main entry point for the LLM Data Pipeline.
 
-"""LLM Data Pipeline - Main entry point."""
+This script provides a CLI interface for processing Git repositories
+and generating training data for LLMs in various formats.
+"""
 
-import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
 
-from src.config import AppConfig
-from src.cli import parse_arguments
-from src.log_manager import LogManager
-from src.logging_config import configure_scrape_logging, configure_tqdm_logging
-from src.pipeline_factory import PipelineFactory
+import structlog
+
+# Add src directory to Python path to ensure imports work correctly
+# This is necessary to run main.py directly from the project root
+src_dir = Path(__file__).parent / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+from src.core.config import AppConfig
+from src.llm.mlx_manager import handle_mlx_command
+from src.pipeline.cli import parse_arguments
+from src.pipeline.di_container import setup_container
+from src.pipeline.orchestration_service import OrchestrationService
+from src.pipeline.preflight import run_preflight_checks
+from src.pipeline.quickstart import run_quickstart_wizard
+from src.pipeline.realtime_status import show_realtime_status
+from src.ui.pipeline_tui import PipelineTUIApp
+from src.utils.patches import apply_patches
+from src.utils.reset_utils import reset_all, reset_database, reset_logs, reset_repos
+from src.utils.status_utils import show_stats, show_status
+
+
+def _run_preflight_check(args, config: AppConfig, command: str) -> None:
+    """Run preflight check if not skipped."""
+    if hasattr(args, "skip_preflight") and not args.skip_preflight:
+        run_preflight_checks(config, Path(args.data_dir), command)
+
+
+def _handle_reset_command(args, config: AppConfig) -> None:
+    """Handle reset command."""
+    if args.reset_command == "db":
+        reset_database(config.DB_PATH)
+    elif args.reset_command == "logs":
+        reset_logs(config.LOG_FILE_PREFIX)
+    elif args.reset_command == "repos":
+        reset_repos(config.REPOS_DIR_NAME)
+    elif args.reset_command == "all":
+        reset_all(config.DB_PATH, config.LOG_FILE_PREFIX, config.REPOS_DIR_NAME)
+    else:
+        logging.error(f"Unknown reset command: {args.reset_command}")
+        sys.exit(1)
 
 
 def main() -> None:
     """Main entry point for the LLM Data Pipeline."""
-    # Load configuration
-    config = AppConfig()
+    # Apply runtime patches
+    apply_patches()
 
-    # Parse command-line arguments
+    # Initialize logging system
+    from src.core.logging_config import setup_logging
+    setup_logging()
+    
+    logger = structlog.get_logger(__name__)
+    logger.info("Application starting")
+
     args = parse_arguments()
+    config = AppConfig()
+    
+    # Initialize dependency injection container
+    container = setup_container(config)
+    orchestrator = container.get(OrchestrationService)
 
-    # Setup logging
-    logs_dir = Path.cwd() / "logs"
-    log_manager = LogManager(logs_dir, config)
-    log_manager.cleanup_old_logs(
-        args.max_log_files if hasattr(args, "max_log_files") else config.MAX_LOG_FILES
-    )
-    log_file_path = log_manager.create_log_file()
-
+    # Command routing
     if args.command == "scrape":
-        configure_scrape_logging(log_file_path)
-    elif args.command in ["prepare", "retry", "export"]:
-        configure_tqdm_logging(log_file_path)
+        _run_preflight_check(args, config, "scrape")
+        if not args.dry_run:
+            orchestrator.scrape()
+        else:
+            logging.info("Dry run: Skipping repository scraping.")
 
-    # Create data directory
-    data_dir = Path.cwd() / (
-        args.data_dir if hasattr(args, "data_dir") else config.DATA_DIR
-    )
-    data_dir.mkdir(parents=True, exist_ok=True)
+    elif args.command == "prepare":
+        _run_preflight_check(args, config, "prepare")
+        # Note: CLI prepare currently doesn't support the same fine-grained 
+        # temperature/max_tokens as TUI via orchestrator directly without 
+        # updating orchestrator/preparation service.
+        # For now, we use orchestrator which uses config values.
+        if not args.dry_run:
+            orchestrator.prepare()
+        else:
+            logging.info("Dry run: Skipping file processing.")
 
-    # Execute command
-    try:
-        if args.command in ["scrape", "prepare", "retry", "export"]:
-            # Initialize pipeline using factory only for pipeline commands
-            factory = PipelineFactory(config)
-            repos_dir = str(Path(config.BASE_DIR) / config.REPOS_DIR_NAME)
+    elif args.command == "retry":
+        _run_preflight_check(args, config, "prepare")
+        if not args.dry_run:
+            orchestrator.retry()
+        else:
+            logging.info("Dry run: Skipping retry.")
 
-            # Use lazy LLM initialization for scrape and export (they don't need LLM)
-            lazy_llm = args.command in ["scrape", "export"]
+    elif args.command == "export":
+        _run_preflight_check(args, config, "export")
+        orchestrator.export(template=args.template, output_file=args.output_file)
 
-            pipeline = factory.create_data_pipeline(
-                data_dir=data_dir,
-                repos_dir=repos_dir,
-                max_tokens=getattr(args, "max_tokens", config.DEFAULT_MAX_TOKENS),
-                temperature=getattr(args, "temperature", config.DEFAULT_TEMPERATURE),
-                lazy_llm=lazy_llm,
-            )
+    elif args.command == "status":
+        from src.data.db_manager import DBManager
+        db_manager = container.get(DBManager)
+        show_status(config, db_manager)
 
-            if args.command == "scrape":
-                asyncio.run(pipeline.scrape())
-            elif args.command == "prepare":
-                asyncio.run(pipeline.prepare())
-            elif args.command == "retry":
-                asyncio.run(pipeline.retry_failed_files())
-            elif args.command == "export":
-                pipeline.export_data(
-                    getattr(args, "template", "alpaca-jsonl"),
-                    getattr(args, "output_file", "output.jsonl"),
-                )
+    elif args.command == "status-realtime":
+        show_realtime_status(config, Path(args.data_dir), duration=args.duration)
 
-            pipeline.close()  # Close the pipeline after use
-        elif args.command == "mlx":
-            # Handle MLX management commands (no pipeline needed)
-            from src.mlx_manager import MLXModelManager
+    elif args.command == "stats":
+        from src.data.db_manager import DBManager
+        db_manager = container.get(DBManager)
+        show_stats(config, db_manager, format_type=args.format)
 
-            manager = MLXModelManager(config)
+    elif args.command == "config":
+        from src.core.config_utils import handle_config_command
+        handle_config_command(config, args)
 
-            if args.mlx_command == "list":
-                models = manager.list_local_models()
-                if models:
-                    print(f"Found {len(models)} locally cached MLX model(s):\n")
-                    for i, model in enumerate(models, 1):
-                        print(f"{i:2d}. {model['name']}")
-                        print(f"    Path: {model['path']}")
-                        print(f"    Size: {model['size']}")
-                        print()
-                else:
-                    print("No locally cached MLX models found.")
-            elif args.mlx_command == "download":
-                manager.download_model(args.model_name)
-            elif args.mlx_command == "remove":
-                manager.remove_model(args.model_name)
-            elif args.mlx_command == "info":
-                info = manager.get_model_info(args.model_name)
-                if info:
-                    print(f"Model: {info['name']}")
-                    print(f"Cached: {'Yes' if info.get('cached', False) else 'No'}")
-                    if info.get("path"):
-                        print(f"Path: {info['path']}")
-                    if info.get("size"):
-                        print(f"Size: {info['size']}")
-                    if info.get("file_count"):
-                        print(f"Number of files: {info['file_count']}")
-                else:
-                    print(f"Could not get information for model: {args.model_name}")
-    except KeyboardInterrupt:
-        print("\n\nInterrupted by user. Exiting gracefully...")
-        sys.exit(0)
+    elif args.command == "mlx":
+        handle_mlx_command(args)
+
+    elif args.command == "quickstart":
+        run_quickstart_wizard()
+
+    elif args.command == "tui":
+        _run_preflight_check(args, config, "prepare")
+        app = PipelineTUIApp(config, Path(args.data_dir))
+        app.run()
+        # Use os._exit to immediately terminate, avoiding C++ runtime crashes
+        os._exit(0)
+
+    elif args.command == "reset":
+        _handle_reset_command(args, config)
+
+    else:
+        logging.error(f"Unknown command: {args.command}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

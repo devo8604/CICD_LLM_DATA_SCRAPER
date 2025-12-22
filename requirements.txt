@@ -1,7 +1,25 @@
-gitpython
-requests
-beautifulsoup4
-tqdm
-httpx
-mlx
-mlx-lm
+# DEPRECATED: This file is kept for backward compatibility.
+# Please use pyproject.toml for dependency management:
+#
+#   pip install -e .              # Install package with core dependencies
+#   pip install -e ".[dev]"       # Install with development dependencies
+#   pip install -e ".[mlx]"       # Install with MLX support (macOS only)
+#   pip install -e ".[all]"       # Install everything
+#
+# Or continue using this file:
+#   pip install -r requirements.txt
+#   pip install -r requirements-dev.txt  # For development
+
+# Core requirements (pinned to major versions)
+PyYAML~=6.0
+httpx~=0.28.0
+rich~=14.0
+tqdm~=4.67
+textual~=6.10
+psutil~=7.1
+huggingface-hub~=0.36
+tokenizers~=0.22
+
+# MLX for Apple Silicon (optional - only works on macOS)
+mlx~=0.30; sys_platform == 'darwin'
+mlx-lm~=0.29; sys_platform == 'darwin'
