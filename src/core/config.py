@@ -23,10 +23,10 @@ from src.core.config_models import (
 class AppConfig:
     """
     Application configuration facade providing access to configuration settings
-    to the Pydantic-based AppConfigModel.
+    via the Pydantic-based AppConfigModel.
 
-    This class wraps AppConfigModel to maintain the existing uppercase attribute
-    interface (e.g., config.LLM_BASE_URL) while using Pydantic for validation.
+    Use config.model.<section>.<attribute> to access configuration values
+    (e.g., config.model.llm.base_url) for type-safe, validated configuration access.
     """
 
     def __init__(self, config_file: str | None = None):

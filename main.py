@@ -41,14 +41,20 @@ def _run_preflight_check(args, config: AppConfig, command: str) -> None:
 
 def _handle_reset_command(args, config: AppConfig) -> None:
     """Handle reset command."""
+    # Compute paths from config.model.* instead of uppercase properties
+    data_dir = Path(config.model.pipeline.base_dir) / config.model.pipeline.data_dir
+    db_path = data_dir / "pipeline.db"
+    logs_dir = Path(config.model.logging.log_file_prefix).parent if "/" in config.model.logging.log_file_prefix else Path("logs")
+    repos_dir = data_dir / config.model.pipeline.repos_dir_name
+
     if args.reset_command == "db":
-        reset_database(config.DB_PATH)
+        reset_database(str(db_path))
     elif args.reset_command == "logs":
-        reset_logs(config.LOG_FILE_PREFIX)
+        reset_logs(str(logs_dir))
     elif args.reset_command == "repos":
-        reset_repos(config.REPOS_DIR_NAME)
+        reset_repos(str(repos_dir))
     elif args.reset_command == "all":
-        reset_all(config.DB_PATH, config.LOG_FILE_PREFIX, config.REPOS_DIR_NAME)
+        reset_all(str(db_path), str(logs_dir), str(repos_dir))
     else:
         logging.error(f"Unknown reset command: {args.reset_command}")
         sys.exit(1)
@@ -61,14 +67,15 @@ def main() -> None:
 
     # Initialize logging system
     from src.core.logging_config import setup_logging
+
     setup_logging()
-    
+
     logger = structlog.get_logger(__name__)
     logger.info("Application starting")
 
     args = parse_arguments()
     config = AppConfig()
-    
+
     # Initialize dependency injection container
     container = setup_container(config)
     orchestrator = container.get(OrchestrationService)
@@ -83,8 +90,8 @@ def main() -> None:
 
     elif args.command == "prepare":
         _run_preflight_check(args, config, "prepare")
-        # Note: CLI prepare currently doesn't support the same fine-grained 
-        # temperature/max_tokens as TUI via orchestrator directly without 
+        # Note: CLI prepare currently doesn't support the same fine-grained
+        # temperature/max_tokens as TUI via orchestrator directly without
         # updating orchestrator/preparation service.
         # For now, we use orchestrator which uses config values.
         if not args.dry_run:
@@ -105,6 +112,7 @@ def main() -> None:
 
     elif args.command == "status":
         from src.data.db_manager import DBManager
+
         db_manager = container.get(DBManager)
         show_status(config, db_manager)
 
@@ -113,11 +121,13 @@ def main() -> None:
 
     elif args.command == "stats":
         from src.data.db_manager import DBManager
+
         db_manager = container.get(DBManager)
         show_stats(config, db_manager, format_type=args.format)
 
     elif args.command == "config":
         from src.core.config_utils import handle_config_command
+
         handle_config_command(config, args)
 
     elif args.command == "mlx":

@@ -117,33 +117,32 @@ class TestAppConfig:
 
         config = AppConfig()
 
-        # Should default to llama_cpp (USE_MLX = False)
-        assert config.USE_MLX is False
+        # Should default to llama_cpp (use_mlx = False)
+        assert config.model.use_mlx is False
 
     def test_mlx_configuration_attributes(self):
         """Test MLX-specific configuration attributes."""
         config = AppConfig()
 
-        assert hasattr(config, "USE_MLX")
-        assert hasattr(config, "MLX_MODEL_NAME")
-        assert hasattr(config, "MLX_MAX_RAM_GB")
-        assert hasattr(config, "MLX_QUANTIZE")
-        assert hasattr(config, "MLX_TEMPERATURE")
+        assert hasattr(config.model, "use_mlx")
+        assert hasattr(config.model, "mlx")
+        assert hasattr(config.model.mlx, "model_name")
+        assert hasattr(config.model.mlx, "max_ram_gb")
+        assert hasattr(config.model.mlx, "quantize")
+        assert hasattr(config.model.mlx, "temperature")
 
-        # The current default in src/config.py
-        assert config.MLX_MODEL_NAME == "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
+        # The current default in src/config_models.py
+        assert config.model.mlx.model_name == "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit"
 
     def test_mlx_ram_calculation(self, mock_config_loader):
         """Test automatic MLX RAM calculation (80% of total)."""
         # Provide MLX config without max_ram_gb to trigger calculation
         mock_config_loader.load.return_value = {
             "llm": {"backend": "mlx"},
-            "mlx": {}  # Empty MLX config triggers auto-calculation
+            "mlx": {},  # Empty MLX config triggers auto-calculation
         }
 
-        with patch("psutil.virtual_memory") as mock_vmem, \
-             patch("platform.machine", return_value="arm64"), \
-             patch("platform.system", return_value="Darwin"):
+        with patch("psutil.virtual_memory") as mock_vmem, patch("platform.machine", return_value="arm64"), patch("platform.system", return_value="Darwin"):
             # Mock 16GB total RAM
             mock_vmem.return_value.total = 16 * 1024 * 1024 * 1024
 
@@ -151,6 +150,6 @@ class TestAppConfig:
 
             # 80% of 16GB is 12.8GB, int is 12
             expected_limit = 12
-            assert config.MLX_MAX_RAM_GB == expected_limit
-            assert config.MLX_QUANTIZE is True
-            assert config.MLX_TEMPERATURE == 0.7
+            assert config.model.mlx.max_ram_gb == expected_limit
+            assert config.model.mlx.quantize is True
+            assert config.model.mlx.temperature == 0.7

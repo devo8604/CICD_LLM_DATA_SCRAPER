@@ -46,10 +46,10 @@ class ConfigScreen(ModalScreen[None]):
             self.settings_list.extend(
                 [
                     ("MLX Settings", None, None),
-                    ("llm.mlx_model_name", "MLX Model Name", "text"),
-                    ("llm.mlx_max_ram_gb", "MLX Max RAM (GB)", "integer"),
-                    ("llm.mlx_quantize", "MLX Quantize", "boolean"),
-                    ("llm.mlx_temperature", "MLX Temperature", "float"),
+                    ("mlx.model_name", "MLX Model Name", "text"),
+                    ("mlx.max_ram_gb", "MLX Max RAM (GB)", "integer"),
+                    ("mlx.quantize", "MLX Quantize", "boolean"),
+                    ("mlx.temperature", "MLX Temperature", "float"),
                 ]
             )
 
@@ -91,36 +91,18 @@ class ConfigScreen(ModalScreen[None]):
                 self.original_values[key] = current_value
 
     def _get_config_attr(self, key: str):
-        """Get config attribute."""
-        attr_map = {
-            "llm.base_url": "LLM_BASE_URL",
-            "llm.model_name": "LLM_MODEL_NAME",
-            "llm.max_retries": "LLM_MAX_RETRIES",
-            "llm.request_timeout": "LLM_REQUEST_TIMEOUT",
-            "llm.mlx_model_name": "MLX_MODEL_NAME",
-            "llm.mlx_max_ram_gb": "MLX_MAX_RAM_GB",
-            "llm.mlx_quantize": "MLX_QUANTIZE",
-            "llm.mlx_temperature": "MLX_TEMPERATURE",
-            "pipeline.base_dir": "BASE_DIR",
-            "pipeline.data_dir": "DATA_DIR",
-            "pipeline.repos_dir_name": "REPOS_DIR_NAME",
-            "pipeline.max_file_size": "MAX_FILE_SIZE",
-            "logging.max_log_files": "MAX_LOG_FILES",
-            "logging.log_file_prefix": "LOG_FILE_PREFIX",
-            "generation.default_max_tokens": "DEFAULT_MAX_TOKENS",
-            "generation.default_temperature": "DEFAULT_TEMPERATURE",
-            "battery.low_threshold": "BATTERY_LOW_THRESHOLD",
-            "battery.high_threshold": "BATTERY_HIGH_THRESHOLD",
-            "battery.check_interval": "BATTERY_CHECK_INTERVAL",
-            "state.save_interval": "STATE_SAVE_INTERVAL",
-            "processing.max_concurrent_files": "MAX_CONCURRENT_FILES",
-            "processing.file_batch_size": "FILE_BATCH_SIZE",
-            "performance.file_hash_cache_size": "FILE_HASH_CACHE_SIZE",
-            "performance.database_connection_pool_size": "DATABASE_CONNECTION_POOL_SIZE",
-            "performance.chunk_read_size": "CHUNK_READ_SIZE",
-        }
-        attr_name = attr_map.get(key)
-        return getattr(self.config, attr_name, None) if attr_name else None
+        """Get config attribute using dotted key notation (e.g., 'llm.base_url')."""
+        try:
+            parts = key.split(".")
+            if len(parts) != 2:
+                return None
+            section, attr = parts
+            section_obj = getattr(self.config.model, section, None)
+            if section_obj is None:
+                return None
+            return getattr(section_obj, attr, None)
+        except Exception:
+            return None
 
     def compose(self) -> ComposeResult:
         """Compose layout."""
@@ -222,45 +204,23 @@ class ConfigScreen(ModalScreen[None]):
                 self.update_display()
             except ValueError:
                 try:
-                    self.app.query_one("#log-widget", LogPanel).log_message(
-                        f"Invalid {value_type} value: {result}", "error"
-                    )
+                    self.app.query_one("#log-widget", LogPanel).log_message(f"Invalid {value_type} value: {result}", "error")
                 except Exception:
                     pass
 
         self.app.push_screen(InputDialog(display_name, str(current_value), value_type), handle_dialog_result)
 
     def _update_config_value(self, key: str, new_value, value_type: str):
-        attr_map = {
-            "llm.base_url": "LLM_BASE_URL",
-            "llm.model_name": "LLM_MODEL_NAME",
-            "llm.max_retries": "LLM_MAX_RETRIES",
-            "llm.request_timeout": "LLM_REQUEST_TIMEOUT",
-            "llm.mlx_model_name": "MLX_MODEL_NAME",
-            "llm.mlx_max_ram_gb": "MLX_MAX_RAM_GB",
-            "llm.mlx_quantize": "MLX_QUANTIZE",
-            "llm.mlx_temperature": "MLX_TEMPERATURE",
-            "pipeline.base_dir": "BASE_DIR",
-            "pipeline.data_dir": "DATA_DIR",
-            "pipeline.repos_dir_name": "REPOS_DIR_NAME",
-            "pipeline.max_file_size": "MAX_FILE_SIZE",
-            "logging.max_log_files": "MAX_LOG_FILES",
-            "logging.log_file_prefix": "LOG_FILE_PREFIX",
-            "generation.default_max_tokens": "DEFAULT_MAX_TOKENS",
-            "generation.default_temperature": "DEFAULT_TEMPERATURE",
-            "battery.low_threshold": "BATTERY_LOW_THRESHOLD",
-            "battery.high_threshold": "BATTERY_HIGH_THRESHOLD",
-            "battery.check_interval": "BATTERY_CHECK_INTERVAL",
-            "state.save_interval": "STATE_SAVE_INTERVAL",
-            "processing.max_concurrent_files": "MAX_CONCURRENT_FILES",
-            "processing.file_batch_size": "FILE_BATCH_SIZE",
-            "performance.file_hash_cache_size": "FILE_HASH_CACHE_SIZE",
-            "performance.database_connection_pool_size": "DATABASE_CONNECTION_POOL_SIZE",
-            "performance.chunk_read_size": "CHUNK_READ_SIZE",
-        }
-        attr_name = attr_map.get(key)
-        if attr_name:
-            setattr(self.config, attr_name, new_value)
+        """Update config value using dotted key notation (e.g., 'llm.base_url')."""
+        try:
+            parts = key.split(".")
+            if len(parts) == 2:
+                section, attr = parts
+                section_obj = getattr(self.config.model, section, None)
+                if section_obj is not None:
+                    setattr(section_obj, attr, new_value)
+        except Exception:
+            pass
         self.config_values[key] = (new_value, value_type)
 
     def update_display(self):
@@ -318,35 +278,18 @@ class ConfigScreen(ModalScreen[None]):
                 pass
 
     def _get_default_value_for_key(self, key: str, default_config: AppConfig):
-        attr_map = {
-            "llm.base_url": "LLM_BASE_URL",
-            "llm.model_name": "LLM_MODEL_NAME",
-            "llm.max_retries": "LLM_MAX_RETRIES",
-            "llm.request_timeout": "LLM_REQUEST_TIMEOUT",
-            "llm.mlx_model_name": "MLX_MODEL_NAME",
-            "llm.mlx_max_ram_gb": "MLX_MAX_RAM_GB",
-            "llm.mlx_quantize": "MLX_QUANTIZE",
-            "llm.mlx_temperature": "MLX_TEMPERATURE",
-            "pipeline.base_dir": "BASE_DIR",
-            "pipeline.data_dir": "DATA_DIR",
-            "pipeline.repos_dir_name": "REPOS_DIR_NAME",
-            "pipeline.max_file_size": "MAX_FILE_SIZE",
-            "logging.max_log_files": "MAX_LOG_FILES",
-            "logging.log_file_prefix": "LOG_FILE_PREFIX",
-            "generation.default_max_tokens": "DEFAULT_MAX_TOKENS",
-            "generation.default_temperature": "DEFAULT_TEMPERATURE",
-            "battery.low_threshold": "BATTERY_LOW_THRESHOLD",
-            "battery.high_threshold": "BATTERY_HIGH_THRESHOLD",
-            "battery.check_interval": "BATTERY_CHECK_INTERVAL",
-            "state.save_interval": "STATE_SAVE_INTERVAL",
-            "processing.max_concurrent_files": "MAX_CONCURRENT_FILES",
-            "processing.file_batch_size": "FILE_BATCH_SIZE",
-            "performance.file_hash_cache_size": "FILE_HASH_CACHE_SIZE",
-            "performance.database_connection_pool_size": "DATABASE_CONNECTION_POOL_SIZE",
-            "performance.chunk_read_size": "CHUNK_READ_SIZE",
-        }
-        attr_name = attr_map.get(key)
-        return getattr(default_config, attr_name, None) if attr_name else None
+        """Get default value for key using dotted key notation (e.g., 'llm.base_url')."""
+        try:
+            parts = key.split(".")
+            if len(parts) != 2:
+                return None
+            section, attr = parts
+            section_obj = getattr(default_config.model, section, None)
+            if section_obj is None:
+                return None
+            return getattr(section_obj, attr, None)
+        except Exception:
+            return None
 
     def action_close_screen(self) -> None:
         self.dismiss()

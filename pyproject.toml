@@ -138,8 +138,8 @@ exclude_lines = [
 # Same as Black.
 line-length = 180
 
-# Assume Python 3.14.
-target-version = "py314"
+# Assume Python 3.13 for ruff compatibility (ruff doesn't support py314 yet).
+target-version = "py313"
 
 [tool.ruff.lint]
 # Enable pycodestyle (E) and Pyflakes (F) codes by default.
