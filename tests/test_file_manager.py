@@ -203,11 +203,7 @@ class TestFileManagerGetAllFilesInRepo:
             binary.write_bytes(b"binary")
             pptx.write_bytes(b"pptx")
 
-            file_manager = FileManager(
-                repos_dir=tmpdir, 
-                max_file_size=10 * 1024 * 1024,
-                allowed_extensions=[".py", ".js", ".txt"]
-            )
+            file_manager = FileManager(repos_dir=tmpdir, max_file_size=10 * 1024 * 1024, allowed_extensions=[".py", ".js", ".txt"])
             files = file_manager.get_all_files_in_repo(tmpdir)
 
             # .bin and .pptx should be excluded

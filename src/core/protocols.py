@@ -13,9 +13,7 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
-    async def generate_questions(
-        self, content: str, temperature: float = 0.7, max_tokens: int = 500, pbar=None
-    ) -> list[str] | None:
+    async def generate_questions(self, content: str, temperature: float = 0.7, max_tokens: int = 500, pbar=None) -> list[str] | None:
         """Generate questions from content."""
         pass
 

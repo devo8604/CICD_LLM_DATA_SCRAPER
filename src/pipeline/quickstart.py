@@ -92,9 +92,7 @@ Let's get started!
 
         # Collect repositories
         repos = []
-        self.console.print(
-            "\n[dim]Enter repository URLs (one at a time). Press Enter with empty input when done.[/dim]"
-        )
+        self.console.print("\n[dim]Enter repository URLs (one at a time). Press Enter with empty input when done.[/dim]")
 
         while True:
             repo_url = Prompt.ask(
@@ -219,10 +217,17 @@ llm:
 
         self.console.print(f"\n[green]✓[/green] Configuration saved to {self.config_file.name}")
 
-        # In the new config system, direct property assignment is not supported
-        # The config is loaded from file and is intended to be immutable during runtime
-        # For testing purposes, these values should be set in the config file or DI container
-        # Skipping direct assignment as it's not compatible with the new Pydantic-based config
+        # Update config in memory if possible
+        if hasattr(self.config, "model"):
+            self.config.model.llm.backend = "llama_cpp"
+            self.config.model.llm.base_url = base_url
+            if model_name:
+                self.config.model.llm.model_name = model_name
+
+        # Also update top-level properties for tests/backward compatibility
+        self.config.LLM_BASE_URL = base_url
+        if model_name:
+            self.config.LLM_MODEL_NAME = model_name
 
         return True
 
@@ -273,10 +278,18 @@ llm:
 
         self.console.print(f"\n[green]✓[/green] Configuration saved to {self.config_file.name}")
 
-        # Update instance config attributes for tests
-        # In the new config system, direct property assignment is not supported
-        # Config values should be set in the configuration file
-        # Skipping these assignments as they're not compatible with the new Pydantic-based config
+        # Update config in memory if possible
+        if hasattr(self.config, "model"):
+            self.config.model.llm.backend = "mlx"
+            self.config.model.mlx.model_name = model_name
+            self.config.model.mlx.max_ram_gb = max_ram
+            self.config.model.mlx.quantize = True
+            self.config.model.use_mlx = True
+
+        # Also update top-level properties for tests/backward compatibility
+        self.config.MLX_MODEL_NAME = model_name
+        self.config.MLX_MAX_RAM_GB = max_ram
+        self.config.USE_MLX = True
 
         return True
 

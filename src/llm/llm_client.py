@@ -8,11 +8,11 @@ import httpx
 if TYPE_CHECKING:
     from tqdm import tqdm
 
+
 from src.core.config import AppConfig
 from src.core.protocols import LLMInterface
-from src.llm.prompt_utils import get_prompt_manager
 from src.core.tokenizer_cache import get_pretokenizer
-from typing import Tuple, Optional
+from src.llm.prompt_utils import get_prompt_manager
 
 
 class LLMClient(LLMInterface):
@@ -41,60 +41,46 @@ class LLMClient(LLMInterface):
         self.request_timeout = request_timeout
         self.prompt_manager = get_prompt_manager(theme=self.config.model.pipeline.prompt_theme)
         self.model_cache_ttl = self.config.model.llm.model_cache_ttl
+        self._initialized = False
+        self._context_window = 4096  # Default fallback
 
-        logging.info(f"LLMClient initialized. Using model: {self.model_name} at {base_url}")
+        logging.info(f"LLMClient initialized (lazy). Using model: {self.model_name} at {base_url}")
+
+    def _ensure_initialized(self) -> None:
+        """Ensure the client is initialized by checking available models and detecting context window."""
+        if self._initialized:
+            return
 
         try:
-            # Call sync method for initial check
-            logging.info("Calling _get_available_llm_models_sync_wrapper in __init__.")
+            logging.info("Lazy initializing LLMClient: fetching available models.")
             available_models = self._get_available_llm_models_sync_wrapper()
-            logging.info(
-                f"Finished _get_available_llm_models_sync_wrapper in __init__. Found models: {available_models}"
-            )
-        except Exception as e:
-            logging.critical(
-                f"An unexpected error occurred during initial model fetch: {e}",
-                exc_info=True,
-            )
-            available_models = []
 
-        if available_models:
-            if self.model_name in available_models:
-                logging.info(f"Using specified model: {self.model_name}")
-            else:
-                logging.warning(f"Specified model '{self.model_name}' not found on the LLM server.")
-                logging.info(f"Available models: {', '.join(available_models)}")
-                if available_models:
+            if available_models:
+                if self.model_name in available_models:
+                    logging.info(f"Using specified model: {self.model_name}")
+                else:
+                    logging.warning(f"Specified model '{self.model_name}' not found on the LLM server.")
                     # Fallback to the first available model
                     original_model_name = self.model_name
                     self.model_name = available_models[0]
-                    logging.info(
-                        f"Requested model '{original_model_name}' not found. "
-                        f"Falling back to first available model: {self.model_name}"
-                    )
-                else:
-                    logging.critical("No models available on the LLM server. Please load a model.")
-                    self.model_name = None  # Indicate no usable model
-        else:
-            logging.critical(
-                "Could not connect to LLM server or retrieve model list. Please ensure the server is running."
-            )
-            self.model_name = None  # Indicate no usable model
+                    logging.info(f"Requested model '{original_model_name}' not found. Falling back to first available model: {self.model_name}")
+            else:
+                logging.critical("Could not connect to LLM server or retrieve model list.")
+                raise ValueError("No usable LLM model available. Check LLM server and configuration.")
 
-        if not self.model_name:
-            logging.critical(
-                "LLMClient is not initialized with a usable model. Raising an exception to halt processing."
-            )
-            raise ValueError("No usable LLM model available or configured. Check LLM server and model loads.")
+            # Detect context window
+            self._context_window = self._detect_context_window()
+            logging.info(f"Detected context window for {self.model_name}: {self._context_window}")
 
-        # Detect context window
-        self._context_window = self._detect_context_window()
-        logging.info(f"Context window for {self.model_name}: {self._context_window}")
+            # Initialize pre-tokenizer for efficient token operations
+            self.pretokenizer = get_pretokenizer(self.model_name)
 
-        # Initialize pre-tokenizer for efficient token operations
-        self.pretokenizer = get_pretokenizer(self.model_name)
+            self._initialized = True
+            logging.info("LLMClient successfully initialized.")
 
-        logging.info("LLMClient successfully initialized with a usable model.")
+        except Exception as e:
+            logging.error(f"Failed to initialize LLMClient: {e}")
+            raise
 
     def _get_available_llm_models_sync_wrapper(self) -> list[str]:
         """Wrapper to manage sync client lifecycle."""
@@ -108,11 +94,7 @@ class LLMClient(LLMInterface):
         logging.info("Attempting to get available LLM models.")
         # Check cache first
         current_time = time.time()
-        if (
-            LLMClient._model_cache is not None
-            and LLMClient._model_cache_time is not None
-            and (current_time - LLMClient._model_cache_time) < self.model_cache_ttl
-        ):
+        if LLMClient._model_cache is not None and LLMClient._model_cache_time is not None and (current_time - LLMClient._model_cache_time) < self.model_cache_ttl:
             logging.debug("Using cached model list")
             return LLMClient._model_cache
 
@@ -146,9 +128,7 @@ class LLMClient(LLMInterface):
             logging.error(f"Failed to retrieve LLM model list from {models_api_url}: {e}")
             return []
         except json.JSONDecodeError:
-            logging.error(
-                f"Failed to decode JSON from LLM server at {models_api_url}. Response: {response.text[:200]}..."
-            )
+            logging.error(f"Failed to decode JSON from LLM server at {models_api_url}. Response: {response.text[:200]}...")
             return []
         except Exception as e:
             logging.error(f"An unexpected error occurred while getting model list: {e}")
@@ -212,19 +192,14 @@ class LLMClient(LLMInterface):
                     httpx.TimeoutException,
                     httpx.RequestError,
                 ) as e:
-                    logging.error(
-                        f"LLM API error during {function_name} (Attempt {attempt + 1}/{self.max_retries}): {e}"
-                    )
+                    logging.error(f"LLM API error during {function_name} (Attempt {attempt + 1}/{self.max_retries}): {e}")
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay)
                     else:
                         logging.error(f"Failed to complete {function_name} after {self.max_retries} attempts.")
                         return None
                 except Exception as e:
-                    logging.error(
-                        f"An unexpected error occurred during {function_name} stream "
-                        f"(Attempt {attempt + 1}/{self.max_retries}): {e}"
-                    )
+                    logging.error(f"An unexpected error occurred during {function_name} stream (Attempt {attempt + 1}/{self.max_retries}): {e}")
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay)
                     else:
@@ -245,6 +220,7 @@ class LLMClient(LLMInterface):
         pbar: tqdm | None = None,
     ) -> list[str] | None:
         """Generate questions from code/text using LLM."""
+        self._ensure_initialized()
         system_prompt = self.prompt_manager.get_prompt("question_system")
         user_prompt_template = self.prompt_manager.get_prompt("question_user")
 
@@ -279,11 +255,7 @@ class LLMClient(LLMInterface):
 
         generated_text = response_json["choices"][0]["message"]["content"]
         # Split by newline and filter for valid questions
-        all_questions = [
-            q.strip()
-            for q in generated_text.split("\n")
-            if q.strip() and len(q.strip()) >= 100 and len(q.strip()) <= 300 and (q.strip().endswith("?") or "?" in q)
-        ]
+        all_questions = [q.strip() for q in generated_text.split("\n") if q.strip() and len(q.strip()) >= 100 and len(q.strip()) <= 300 and (q.strip().endswith("?") or "?" in q)]
 
         # Enforce strict limit of 5 high-quality questions
         questions = all_questions[:5]
@@ -302,6 +274,7 @@ class LLMClient(LLMInterface):
         pbar: tqdm | None = None,
     ) -> str | None:
         """Generate answer for a single question given context."""
+        self._ensure_initialized()
         instructional_part = self.prompt_manager.get_prompt("answer_system")
 
         # Use configured token limits for answer context
@@ -374,6 +347,7 @@ comprehension.
     @property
     def context_window(self) -> int:
         """Return the context window size."""
+        self._ensure_initialized()
         return self._context_window
 
     def _detect_context_window(self) -> int:
@@ -396,6 +370,7 @@ comprehension.
                         params = data.get("parameters", "")
                         if "num_ctx" in params:
                             import re
+
                             match = re.search(r"num_ctx\s+(\d+)", params)
                             if match:
                                 return int(match.group(1))
@@ -412,12 +387,11 @@ comprehension.
         if not content:
             return ""
 
+        self._ensure_initialized()
         # Use the pre-tokenizer for accurate truncation
         return self.pretokenizer.cache.truncate_to_tokens(content, max_tokens)
 
-    def validate_request_size(self,
-                            prompt: str,
-                            expected_output_tokens: int = 100) -> Tuple[bool, str]:
+    def validate_request_size(self, prompt: str, expected_output_tokens: int = 100) -> tuple[bool, str]:
         """
         Validate if a request will fit within context limits before sending to LLM.
 
@@ -428,16 +402,10 @@ comprehension.
         Returns:
             Tuple of (is_valid, message)
         """
-        return self.pretokenizer.validate_request_size(
-            prompt,
-            self._context_window,
-            expected_output_tokens
-        )
+        self._ensure_initialized()
+        return self.pretokenizer.validate_request_size(prompt, self._context_window, expected_output_tokens)
 
-    def prepare_and_validate_request(self,
-                                   system_message: str,
-                                   user_message: str,
-                                   expected_output_tokens: int = 100) -> Tuple[bool, str, Optional[str]]:
+    def prepare_and_validate_request(self, system_message: str, user_message: str, expected_output_tokens: int = 100) -> tuple[bool, str, str | None]:
         """
         Prepare and validate a complete request in one step.
 
@@ -449,9 +417,5 @@ comprehension.
         Returns:
             Tuple of (is_valid, message, prepared_prompt_or_none)
         """
-        return self.pretokenizer.prepare_and_validate(
-            system_message,
-            user_message,
-            self._context_window,
-            expected_output_tokens
-        )
+        self._ensure_initialized()
+        return self.pretokenizer.prepare_and_validate(system_message, user_message, self._context_window, expected_output_tokens)

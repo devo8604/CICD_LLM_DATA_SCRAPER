@@ -82,9 +82,7 @@ class DataExporter:
                 for conversation in all_conversations:
                     formatted_entry = self._format_conversation_to_template(conversation, template_name)
                     writer.writerow(formatted_entry)
-            logging.info(
-                f"Successfully exported {len(all_conversations)} conversations to {output_file} in CSV format."
-            )
+            logging.info(f"Successfully exported {len(all_conversations)} conversations to {output_file} in CSV format.")
             return
 
         exported_lines = []
@@ -93,13 +91,10 @@ class DataExporter:
             if template_name in ["alpaca-jsonl", "chatml-jsonl"]:
                 formatted_entry = self._format_conversation_to_template(conversation, template_name)
                 # Ensure it's a dictionary/list before dumping
-                if isinstance(formatted_entry, (dict, list)):
+                if isinstance(formatted_entry, dict | list):
                     exported_lines.append(json.dumps(formatted_entry))
                 else:
-                    raise ValueError(
-                        f"Template '{template_name}' did not return a JSON-serializable object for conversation "
-                        f"{conversation['sample_id']}."
-                    )
+                    raise ValueError(f"Template '{template_name}' did not return a JSON-serializable object for conversation {conversation['sample_id']}.")
             else:
                 formatted_string = self._format_conversation_to_template(conversation, template_name)
                 if formatted_string:  # Only add if formatting was successful
@@ -108,6 +103,4 @@ class DataExporter:
         with open(output_file, "w", encoding="utf-8") as f:
             for line in exported_lines:
                 f.write(line + "\n")
-        logging.info(
-            f"Successfully exported {len(exported_lines)} conversations to {output_file} in {template_name} format."
-        )
+        logging.info(f"Successfully exported {len(exported_lines)} conversations to {output_file} in {template_name} format.")

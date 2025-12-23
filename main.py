@@ -11,26 +11,26 @@ import os
 import sys
 from pathlib import Path
 
-import structlog
-
 # Add src directory to Python path to ensure imports work correctly
 # This is necessary to run main.py directly from the project root
 src_dir = Path(__file__).parent / "src"
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-from src.core.config import AppConfig
-from src.llm.mlx_manager import handle_mlx_command
-from src.pipeline.cli import parse_arguments
-from src.pipeline.di_container import setup_container
-from src.pipeline.orchestration_service import OrchestrationService
-from src.pipeline.preflight import run_preflight_checks
-from src.pipeline.quickstart import run_quickstart_wizard
-from src.pipeline.realtime_status import show_realtime_status
-from src.ui.pipeline_tui import PipelineTUIApp
-from src.utils.patches import apply_patches
-from src.utils.reset_utils import reset_all, reset_database, reset_logs, reset_repos
-from src.utils.status_utils import show_stats, show_status
+import structlog  # noqa: E402
+
+from src.core.config import AppConfig  # noqa: E402
+from src.llm.mlx_manager import handle_mlx_command  # noqa: E402
+from src.pipeline.cli import parse_arguments  # noqa: E402
+from src.pipeline.di_container import setup_container  # noqa: E402
+from src.pipeline.orchestration_service import OrchestrationService  # noqa: E402
+from src.pipeline.preflight import run_preflight_checks  # noqa: E402
+from src.pipeline.quickstart import run_quickstart_wizard  # noqa: E402
+from src.pipeline.realtime_status import show_realtime_status  # noqa: E402
+from src.ui.pipeline_tui import PipelineTUIApp  # noqa: E402
+from src.utils.patches import apply_patches  # noqa: E402
+from src.utils.reset_utils import reset_all, reset_database, reset_logs, reset_repos  # noqa: E402
+from src.utils.status_utils import show_stats, show_status  # noqa: E402
 
 
 def _run_preflight_check(args, config: AppConfig, command: str) -> None:

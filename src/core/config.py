@@ -126,6 +126,152 @@ class AppConfig:
         """Access to the underlying Pydantic model for new code."""
         return self._model
 
+    # Internal computed properties still needed for application functionality
+    @property
+    def backend(self) -> str:
+        """Return the current LLM backend name."""
+        return "mlx" if self._model.use_mlx else "llama_cpp"
+
+    @property
+    def BASE_DIR(self) -> str:
+        """Base directory for the application (needed for internal file operations)."""
+        return str(self._base_dir)
+
+    @property
+    def REPOS_DIR_NAME(self) -> str:
+        """Repository directory name (needed for internal operations)."""
+        return self._model.pipeline.repos_dir_name
+
+    @property
+    def DATA_DIR(self) -> str:
+        """Data directory (needed for internal operations)."""
+        return self._model.pipeline.data_dir
+
+    @property
+    def DB_PATH(self) -> str:
+        """Database path (needed for internal operations)."""
+        return str(self._db_path)
+
+    @property
+    def REPOS_DIR(self) -> str:
+        """Repository directory path (needed for internal operations)."""
+        return str(self._repos_dir)
+
+    @property
+    def LLM_BASE_URL(self) -> str:
+        """LLM base URL (needed for internal operations)."""
+        return self._model.llm.base_url
+
+    @property
+    def LLM_MODEL_NAME(self) -> str:
+        """LLM model name (needed for internal operations)."""
+        return self._model.llm.model_name
+
+    @property
+    def LLM_MAX_RETRIES(self) -> int:
+        """LLM max retries (needed for internal operations)."""
+        return self._model.llm.max_retries
+
+    @property
+    def LLM_RETRY_DELAY(self) -> float:
+        """LLM retry delay (needed for internal operations)."""
+        return self._model.llm.retry_delay
+
+    @property
+    def LLM_REQUEST_TIMEOUT(self) -> int:
+        """LLM request timeout (needed for internal operations)."""
+        return self._model.llm.request_timeout
+
+    @property
+    def LLM_MODEL_CACHE_TTL(self) -> int:
+        """LLM model cache TTL (needed for internal operations)."""
+        return self._model.llm.cache_ttl
+
+    @property
+    def DEFAULT_MAX_TOKENS(self) -> int:
+        """Default max tokens (needed for internal operations)."""
+        return self._model.generation.default_max_tokens
+
+    @property
+    def DEFAULT_TEMPERATURE(self) -> float:
+        """Default temperature (needed for internal operations)."""
+        return self._model.generation.default_temperature
+
+    @property
+    def MAX_FILE_SIZE(self) -> int:
+        """Max file size (needed for internal operations)."""
+        return self._model.pipeline.max_file_size
+
+    @property
+    def CHUNK_READ_SIZE(self) -> int:
+        """Chunk read size (needed for internal operations)."""
+        return self._model.processing.chunk_read_size
+
+    @property
+    def USE_MLX(self) -> bool:
+        """Use MLX flag (needed for internal operations)."""
+        return self._model.use_mlx
+
+    @property
+    def MLX_MODEL_NAME(self) -> str:
+        """MLX model name (needed for internal operations)."""
+        return self._model.mlx.model_name
+
+    @property
+    def PROMPT_THEME(self) -> str:
+        """Prompt theme (needed for internal operations)."""
+        return self._model.pipeline.prompt_theme
+
+    @property
+    def MAX_LOG_FILES(self) -> int:
+        """Max log files (needed for internal operations)."""
+        return self._model.logging.max_log_files
+
+    @property
+    def LOG_FILE_PREFIX(self) -> str:
+        """Log file prefix (needed for internal operations)."""
+        return self._model.logging.log_file_prefix
+
+    @property
+    def MIN_QUESTION_TOKENS(self) -> int:
+        """Min question tokens (needed for internal operations)."""
+        return self._model.generation.min_question_tokens
+
+    @property
+    def MAX_QUESTION_TOKENS(self) -> int:
+        """Max question tokens (needed for internal operations)."""
+        return self._model.generation.max_question_tokens
+
+    @property
+    def MIN_ANSWER_CONTEXT_TOKENS(self) -> int:
+        """Min answer context tokens (needed for internal operations)."""
+        return self._model.generation.min_answer_context_tokens
+
+    @property
+    def MAX_ANSWER_CONTEXT_TOKENS(self) -> int:
+        """Max answer context tokens (needed for internal operations)."""
+        return self._model.generation.max_answer_context_tokens
+
+    @property
+    def BATTERY_LOW_THRESHOLD(self) -> int:
+        """Battery low threshold (needed for internal operations)."""
+        return self._model.battery.low_threshold
+
+    @property
+    def BATTERY_HIGH_THRESHOLD(self) -> int:
+        """Battery high threshold (needed for internal operations)."""
+        return self._model.battery.high_threshold
+
+    @property
+    def BATTERY_CHECK_INTERVAL(self) -> int:
+        """Battery check interval (needed for internal operations)."""
+        return self._model.battery.check_interval
+
+    @property
+    def ALLOWED_EXTENSIONS(self) -> tuple:
+        """Allowed extensions (needed for internal operations)."""
+        return self._model.pipeline.allowed_extensions
+
     def get_section_config(self, section: str) -> dict[str, Any]:
         """
         Get configuration for a specific section.

@@ -199,6 +199,7 @@ class TemplateConfig(BaseModel):
 
 class GenerationConfig(BaseModel):
     """Configuration for generation parameters."""
+
     default_max_tokens: int = Field(
         default=4096,
         ge=1,

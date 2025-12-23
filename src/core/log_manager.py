@@ -41,11 +41,7 @@ class LogManager:
             max_files: Maximum number of log files to retain
         """
         log_files = sorted(
-            [
-                f
-                for f in self.logs_dir.iterdir()
-                if f.name.startswith(self.config.model.logging.log_file_prefix) and f.name.endswith(".log")
-            ],
+            [f for f in self.logs_dir.iterdir() if f.name.startswith(self.config.model.logging.log_file_prefix) and f.name.endswith(".log")],
             key=lambda f: f.stat().st_mtime,
         )
 

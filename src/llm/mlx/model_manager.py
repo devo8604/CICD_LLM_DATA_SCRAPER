@@ -8,11 +8,13 @@ import structlog
 try:
     import mlx.core as mx
     from mlx_lm import generate, load
+
     MLX_AVAILABLE = True
 except ImportError:
     MLX_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
+
 
 class MLXModelManager:
     """Manages loading, unloading and memory of MLX models."""
@@ -22,7 +24,7 @@ class MLXModelManager:
         self.model = None
         self.tokenizer = None
         self._context_window = 4096
-        
+
         if not MLX_AVAILABLE:
             raise ImportError("MLX libraries are not installed.")
 
@@ -32,6 +34,7 @@ class MLXModelManager:
             return
 
         import huggingface_hub
+
         original_tqdm = getattr(huggingface_hub, "tqdm", None)
 
         logger.info("Loading MLX model", model_name=self.model_name)
@@ -50,7 +53,7 @@ class MLXModelManager:
 
             self.model.eval()
             self._context_window = self._detect_context_window()
-            
+
             self.clear_memory()
             self._warmup_model()
 

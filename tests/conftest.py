@@ -29,6 +29,7 @@ def disable_tqdm_monitor():
 def mock_db_manager():
     """Fixture for mocking DBManager."""
     from src.data.db_manager import DBManager
+
     mock = MagicMock(spec=DBManager)
     mock.db_path = "test.db"
     return mock

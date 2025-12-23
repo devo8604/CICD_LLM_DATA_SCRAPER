@@ -51,6 +51,12 @@ class TestPreparationService:
         config.BATTERY_LOW_THRESHOLD = 15
         config.BATTERY_HIGH_THRESHOLD = 90
         config.BATTERY_CHECK_INTERVAL = 60
+
+        # Mock model properties
+        config.model.pipeline.base_dir = "."
+        config.model.processing.max_concurrent_files = 1
+        config.model.processing.file_batch_size = 10
+
         return config
 
     @pytest.fixture

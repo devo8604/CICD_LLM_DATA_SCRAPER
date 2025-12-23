@@ -97,7 +97,7 @@ class FileProcessingService:
         try:
             with open(file_path, encoding="utf-8", errors="replace") as f:
                 content = f.read()
-                logger.warning(f"Read file with replacement characters due to encoding issues", file_path=file_path)
+                logger.warning("Read file with replacement characters due to encoding issues", file_path=file_path)
                 return content
         except Exception as e:
             logger.warning("Failed to read file", file_path=file_path, error=str(e))
@@ -136,7 +136,7 @@ class FileProcessingService:
                     )
                     return (False, 0)
                 else:
-                    logger.warning("Attempt failed for file, retrying...", attempt=attempt+1, file_path=file_path, error=str(e))
+                    logger.warning("Attempt failed for file, retrying...", attempt=attempt + 1, file_path=file_path, error=str(e))
                     # Exponential backoff with jitter: 1s, 2s, 4s + random jitter
                     import random
                     import time
@@ -211,6 +211,7 @@ class FileProcessingService:
             # Update progress tracker
             try:
                 from src.ui.progress_tracker import get_progress_tracker
+
                 tracker = get_progress_tracker()
                 file_size = os.path.getsize(file_path)
                 tracker.update_current_file_with_size(file_path, file_size)
@@ -228,22 +229,24 @@ class FileProcessingService:
 
             for question_attempt in range(max_question_retries):
                 try:
-                    logger.info("Attempting to generate questions", file_name=file_name, attempt=question_attempt+1)
+                    logger.info("Attempting to generate questions", file_name=file_name, attempt=question_attempt + 1)
 
-                    if hasattr(self.llm_client, 'context_window'):  # MLXClient
-                        import concurrent.futures
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                            future = executor.submit(
-                                self.llm_client.generate_questions,
-                                content,
-                                self.config.model.generation.default_temperature,
-                                self.config.model.generation.default_max_tokens,
-                                pbar,
-                            )
-                            all_questions_for_file = future.result()  # No timeout - let LLM handle it
+                    # Calculate dynamic timeout based on file size
+                    timeout_seconds = calculate_dynamic_timeout(file_path)
+
+                    if hasattr(self.llm_client, "context_window"):  # MLXClient
+                        all_questions_for_file = TimeoutManager.run_with_timeout_sync(
+                            self.llm_client.generate_questions,
+                            timeout_seconds,
+                            content,
+                            self.config.model.generation.default_temperature,
+                            self.config.model.generation.default_max_tokens,
+                            pbar,
+                        )
                     else:
-                        # Call the LLM method directly without timeout wrapper
-                        all_questions_for_file = self.llm_client.generate_questions(
+                        all_questions_for_file = TimeoutManager.run_with_timeout_sync(
+                            self.llm_client.generate_questions,
+                            timeout_seconds,
                             content,
                             self.config.model.generation.default_temperature,
                             self.config.model.generation.default_max_tokens,
@@ -257,32 +260,34 @@ class FileProcessingService:
                     break
                 except Exception as e:
                     # Handle various types of exceptions including connection issues
-                    import httpx
                     import socket
 
-                    if isinstance(e, (httpx.TimeoutException, socket.timeout)):
-                        logger.warning("Request timeout generating questions", file_name=file_name, attempt=question_attempt+1)
-                    elif isinstance(e, (httpx.ConnectError, httpx.NetworkError, socket.gaierror, ConnectionError)):
-                        logger.warning("Connection error generating questions, may need to reset connection", file_name=file_name, attempt=question_attempt+1)
+                    import httpx
+
+                    if isinstance(e, httpx.TimeoutException | socket.timeout):
+                        logger.warning("Request timeout generating questions", file_name=file_name, attempt=question_attempt + 1)
+                    elif isinstance(e, httpx.ConnectError | httpx.NetworkError | socket.gaierror | ConnectionError):
+                        logger.warning("Connection error generating questions", file_name=file_name, attempt=question_attempt + 1)
                         # Optionally reset connection if supported by the client
-                        if hasattr(self.llm_client, 'reset_connection'):
+                        if hasattr(self.llm_client, "reset_connection"):
                             try:
                                 self.llm_client.reset_connection()
                             except Exception:
                                 logger.warning("Failed to reset connection", file_name=file_name)
                     elif isinstance(e, httpx.HTTPStatusError):
-                        logger.warning(f"HTTP error {e.response.status_code} generating questions", file_name=file_name, attempt=question_attempt+1)
+                        logger.warning(f"HTTP error {e.response.status_code} generating questions", file_name=file_name, attempt=question_attempt + 1)
                     else:
-                        logger.warning("Error generating questions", file_name=file_name, attempt=question_attempt+1, error=str(e))
+                        logger.warning("Error generating questions", file_name=file_name, attempt=question_attempt + 1, error=str(e))
 
                     if question_attempt == max_question_retries - 1:
                         logger.error("Error generating questions after maximum attempts", file_name=file_name, max_attempts=max_question_retries, error=str(e))
                         self.db_manager.add_failed_file(file_path, f"Question generation error after {max_question_retries} attempts: {str(e)}")
                         return (False, 0)
                     else:
-                        logger.warning("Question generation error, retrying...", attempt=question_attempt+1, error=str(e))
+                        logger.warning("Question generation error, retrying...", attempt=question_attempt + 1, error=str(e))
                         import random
                         import time
+
                         time.sleep(min(2**question_attempt + random.uniform(0, 1), 5))
 
             if all_questions_for_file is None:
@@ -292,12 +297,8 @@ class FileProcessingService:
 
             self.llm_client.clear_context()
             processed_hashes = self.db_manager.get_processed_question_hashes(file_path)
-            unanswered_questions = [
-                q
-                for q in all_questions_for_file
-                if hashlib.sha256(q.encode("utf-8")).hexdigest() not in processed_hashes
-            ]
-            
+            unanswered_questions = [q for q in all_questions_for_file if hashlib.sha256(q.encode("utf-8")).hexdigest() not in processed_hashes]
+
             logger.debug("New questions to process", file_name=file_name, count=len(unanswered_questions))
 
             if pbar is not None:
@@ -315,6 +316,7 @@ class FileProcessingService:
                     file_progress = ((i + 1) / len(unanswered_questions)) * 100
                     try:
                         from src.ui.progress_tracker import get_progress_tracker
+
                         tracker = get_progress_tracker()
                         tracker.update_file_progress(file_progress)
                     except Exception:
@@ -330,8 +332,12 @@ class FileProcessingService:
 
                 for answer_attempt in range(max_answer_retries):
                     try:
-                        # Call the LLM method directly without timeout wrapper
-                        answer = self.llm_client.get_answer_single(
+                        # Use dynamic timeout for answers too
+                        timeout_seconds = calculate_dynamic_timeout(file_path)
+
+                        answer = TimeoutManager.run_with_timeout_sync(
+                            self.llm_client.get_answer_single,
+                            timeout_seconds,
                             question,
                             content,
                             self.config.model.generation.default_temperature,
@@ -342,34 +348,36 @@ class FileProcessingService:
                         break
                     except Exception as e:
                         # Handle various types of exceptions including connection issues
-                        import httpx
                         import socket
 
-                        if isinstance(e, (httpx.TimeoutException, socket.timeout)):
-                            logger.warning("Request timeout getting answer", file_name=file_name, attempt=answer_attempt+1)
-                        elif isinstance(e, (httpx.ConnectError, httpx.NetworkError, socket.gaierror, ConnectionError)):
-                            logger.warning("Connection error getting answer, may need to reset connection", file_name=file_name, attempt=answer_attempt+1)
+                        import httpx
+
+                        if isinstance(e, httpx.TimeoutException | socket.timeout):
+                            logger.warning("Request timeout getting answer", file_name=file_name, attempt=answer_attempt + 1)
+                        elif isinstance(e, httpx.ConnectError | httpx.NetworkError | socket.gaierror | ConnectionError):
+                            logger.warning("Connection error getting answer, may need to reset connection", file_name=file_name, attempt=answer_attempt + 1)
                             # Optionally reset connection if supported by the client
-                            if hasattr(self.llm_client, 'reset_connection'):
+                            if hasattr(self.llm_client, "reset_connection"):
                                 try:
                                     self.llm_client.reset_connection()
                                 except Exception:
                                     logger.warning("Failed to reset connection", file_name=file_name)
                         elif isinstance(e, httpx.HTTPStatusError):
-                            logger.warning(f"HTTP error {e.response.status_code} getting answer", file_name=file_name, attempt=answer_attempt+1)
+                            logger.warning(f"HTTP error {e.response.status_code} getting answer", file_name=file_name, attempt=answer_attempt + 1)
                         else:
-                            logger.warning("Error getting answer", file_name=file_name, attempt=answer_attempt+1, error=str(e))
+                            logger.warning("Error getting answer", file_name=file_name, attempt=answer_attempt + 1, error=str(e))
 
                         if answer_attempt == max_answer_retries - 1:
-                            logger.error("Error getting answer after maximum attempts", file_name=file_name, attempt=i+1, error=str(e))
+                            logger.error("Error getting answer after maximum attempts", file_name=file_name, attempt=i + 1, error=str(e))
                         else:
-                            logger.warning("Answer generation error, retrying...", attempt=answer_attempt+1, error=str(e))
+                            logger.warning("Answer generation error, retrying...", attempt=answer_attempt + 1, error=str(e))
                             import random
                             import time
+
                             time.sleep(min(2**answer_attempt + random.uniform(0, 1), 5))
 
                 if not answer_success or answer is None:
-                    logger.error("LLM failed to generate answer", file_name=file_name, question_index=i+1)
+                    logger.error("LLM failed to generate answer", file_name=file_name, question_index=i + 1)
                     file_processed_successfully = False
                     continue
 
@@ -391,6 +399,7 @@ class FileProcessingService:
 
                 try:
                     from src.ui.progress_tracker import get_progress_tracker
+
                     tracker = get_progress_tracker()
                     tracker.update_file_progress(100.0)
                 except Exception:
@@ -405,6 +414,7 @@ class FileProcessingService:
 
                 try:
                     from src.ui.progress_tracker import get_progress_tracker
+
                     tracker = get_progress_tracker()
                     tracker.update_file_progress(100.0)
                 except Exception:

@@ -109,9 +109,7 @@ class ProgressTracker:
         overall_part = f"Overall: {self.overall_progress:.1f}% ({self.files_processed}/{self.total_files} files)"
 
         # Current repository
-        repo_part = (
-            f"Repo: {self.current_repo_index + 1}/{self.total_repos} - {self.current_repo_name or 'Processing...'}"
-        )
+        repo_part = f"Repo: {self.current_repo_index + 1}/{self.total_repos} - {self.current_repo_name or 'Processing...'}"
 
         # Current repository progress
         if self.current_repo_files_total > 0:
@@ -119,10 +117,7 @@ class ProgressTracker:
                 100.0,
                 (self.current_repo_files_processed / self.current_repo_files_total) * 100,
             )
-            repo_detail = (
-                f"Files: {self.current_repo_files_processed}/{self.current_repo_files_total} "
-                f"files ({repo_progress:.1f}%)"
-            )
+            repo_detail = f"Files: {self.current_repo_files_processed}/{self.current_repo_files_total} files ({repo_progress:.1f}%)"
         else:
             repo_detail = "Repo: 0/0 files"
 

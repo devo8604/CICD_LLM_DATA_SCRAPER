@@ -45,6 +45,9 @@ class TestMLXClient:
 
             assert client.model_name == "test-model"
             assert client.config == config
+
+            # Access formatter to trigger lazy loading
+            _ = client.formatter
             mock_load.assert_called_once()
 
     def test_generate_questions(self):

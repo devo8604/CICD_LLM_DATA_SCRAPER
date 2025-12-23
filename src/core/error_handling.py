@@ -87,18 +87,11 @@ def retry(
                     last_exception = e
                     if attempt == actual_max_attempts - 1:  # Last attempt
                         break
-                    logging.warning(
-                        f"Attempt {attempt + 1} failed with {type(e).__name__}: {e}. "
-                        f"Retrying in {current_delay} seconds..."
-                    )
+                    logging.warning(f"Attempt {attempt + 1} failed with {type(e).__name__}: {e}. Retrying in {current_delay} seconds...")
                     time.sleep(current_delay)
                     current_delay *= backoff
 
-            raise (
-                RetryError(last_exception, actual_max_attempts)
-                if last_exception
-                else RetryError(Exception("Unknown error"), actual_max_attempts)
-            )
+            raise (RetryError(last_exception, actual_max_attempts) if last_exception else RetryError(Exception("Unknown error"), actual_max_attempts))
 
         return sync_wrapper
 
@@ -292,10 +285,7 @@ class GracefulShutdown:
 # Utility functions for error handling
 def format_exception_info(exc: Exception, context: str = "") -> str:
     """Format exception information for logging."""
-    return (
-        f"Exception in {context or 'unknown context'}: {type(exc).__name__}: {str(exc)}\n"
-        f"Traceback:\n{traceback.format_exc()}"
-    )
+    return f"Exception in {context or 'unknown context'}: {type(exc).__name__}: {str(exc)}\nTraceback:\n{traceback.format_exc()}"
 
 
 def log_and_raise(logger: logging.Logger, exc: Exception, context: str = ""):

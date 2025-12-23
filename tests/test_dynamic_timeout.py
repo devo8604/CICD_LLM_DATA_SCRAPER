@@ -4,8 +4,6 @@ Test cases for dynamic timeout functionality based on file size.
 
 import os
 import tempfile
-from unittest.mock import patch
-import pytest
 
 from src.core.utils import calculate_dynamic_timeout
 
@@ -15,7 +13,7 @@ def test_calculate_dynamic_timeout_small_file():
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         temp_file.write(b"Small content")
         temp_file.flush()
-        
+
         try:
             timeout = calculate_dynamic_timeout(temp_file.name, base_timeout=300, min_timeout=30, max_timeout=3600)
             # Small file should get close to minimum timeout
@@ -30,7 +28,7 @@ def test_calculate_dynamic_timeout_medium_file():
         # Create a ~1MB file (reference size)
         temp_file.write(b"x" * (1024 * 1024))  # 1MB
         temp_file.flush()
-        
+
         try:
             timeout = calculate_dynamic_timeout(temp_file.name, base_timeout=300, min_timeout=30, max_timeout=3600)
             # Medium file (1MB) should get base timeout (300s) since scaling factor is 1, sqrt(1) = 1
@@ -45,7 +43,7 @@ def test_calculate_dynamic_timeout_large_file():
         # Create a ~4MB file (4x reference size)
         temp_file.write(b"x" * (4 * 1024 * 1024))  # 4MB
         temp_file.flush()
-        
+
         try:
             timeout = calculate_dynamic_timeout(temp_file.name, base_timeout=300, min_timeout=30, max_timeout=3600)
             # Large file (4MB) should get base * sqrt(4) = 300 * 2 = 600 seconds
@@ -61,12 +59,12 @@ def test_calculate_dynamic_timeout_very_large_file():
         # Create a ~100MB file
         temp_file.write(b"x" * (100 * 1024 * 1024))  # 100MB
         temp_file.flush()
-        
+
         try:
             timeout = calculate_dynamic_timeout(temp_file.name, base_timeout=300, min_timeout=30, max_timeout=3600)
             # Very large file (100MB) should get base * sqrt(100) = 300 * 10 = 3000 seconds
             # But capped at max_timeout of 3600
-            expected = min(300 * (100 ** 0.5), 3600)  # 3000 seconds
+            expected = min(300 * (100**0.5), 3600)  # 3000 seconds
             assert timeout == expected
         finally:
             os.unlink(temp_file.name)
@@ -84,7 +82,7 @@ def test_calculate_dynamic_timeout_edge_cases():
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         # Empty file
         temp_file.flush()
-        
+
         try:
             timeout = calculate_dynamic_timeout(temp_file.name, base_timeout=300, min_timeout=30, max_timeout=3600)
             # Empty file should get minimum timeout

@@ -101,10 +101,7 @@ For more information, visit: https://github.com/yourusername/cicdllm
         "--temperature",
         type=float,
         default=config.model.generation.default_temperature,
-        help=(
-            "Sampling temperature for LLM generated questions. "
-            "Lower values make output more deterministic, higher values make it more creative. (0.0 to 1.0)"
-        ),
+        help=("Sampling temperature for LLM generated questions. Lower values make output more deterministic, higher values make it more creative. (0.0 to 1.0)"),
     )
     prepare_parser.add_argument(
         "--dry-run",

@@ -76,6 +76,7 @@ def setup_logging():
     pre_chain = [
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
     ]
 
     formatter = structlog.stdlib.ProcessorFormatter(
@@ -97,7 +98,7 @@ def setup_logging():
 
     # File handler for general application logging
     from pathlib import Path
-    import os
+
     logs_dir = Path("logs")
     logs_dir.mkdir(exist_ok=True)
 
@@ -138,6 +139,7 @@ def configure_scrape_logging(log_file_path: str | Path) -> None:
     try:
         # Create logs directory if it doesn't exist
         from pathlib import Path
+
         logs_dir = Path("logs")
         logs_dir.mkdir(exist_ok=True)
 
@@ -152,6 +154,7 @@ def configure_scrape_logging(log_file_path: str | Path) -> None:
         pre_chain = [
             structlog.stdlib.add_log_level,
             structlog.stdlib.add_logger_name,
+            structlog.processors.TimeStamper(fmt="iso"),
         ]
 
         formatter = structlog.stdlib.ProcessorFormatter(
@@ -190,6 +193,7 @@ def configure_tqdm_logging(log_file_path: str | Path) -> None:
     try:
         # Create logs directory if it doesn't exist
         from pathlib import Path
+
         logs_dir = Path("logs")
         logs_dir.mkdir(exist_ok=True)
 
@@ -205,6 +209,7 @@ def configure_tqdm_logging(log_file_path: str | Path) -> None:
         pre_chain = [
             structlog.stdlib.add_log_level,
             structlog.stdlib.add_logger_name,
+            structlog.processors.TimeStamper(fmt="iso"),
         ]
 
         file_formatter = structlog.stdlib.ProcessorFormatter(
@@ -257,6 +262,7 @@ def add_file_handler(logger: logging.Logger, log_file_path: str | Path) -> loggi
     try:
         # Create logs directory if it doesn't exist
         from pathlib import Path
+
         logs_dir = Path("logs")
         logs_dir.mkdir(exist_ok=True)
 

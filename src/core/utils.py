@@ -122,17 +122,11 @@ def pause_on_low_battery(config: AppConfig | None = None) -> None:
             logging.warning(f"Battery charge is {battery_percent}% (below {low_threshold}%). Pausing processing.")
             logging.info(f"Script will resume when battery is above {high_threshold}%.")
             while battery_percent < high_threshold:
-                logging.info(
-                    f"  (Paused) Current battery: {battery_percent}%. "
-                    f"Checking again in {check_interval_seconds} seconds."
-                )
+                logging.info(f"  (Paused) Current battery: {battery_percent}%. Checking again in {check_interval_seconds} seconds.")
                 time.sleep(check_interval_seconds)
                 battery_percent = check_battery_status()
                 if battery_percent is None:
-                    logging.warning(
-                        "Battery status became unavailable while paused. "
-                        "Resuming processing, but be aware of battery levels."
-                    )
+                    logging.warning("Battery status became unavailable while paused. Resuming processing, but be aware of battery levels.")
                     return  # If status becomes unavailable, resume rather than getting stuck
             logging.info(f"Battery charged to {battery_percent}% (above {high_threshold}%). Resuming processing.")
         else:
@@ -154,7 +148,7 @@ def get_repo_urls_from_file(repos_txt_path: str = "repos.txt") -> list[str]:
         # Validate path to prevent directory traversal
         safe_path = Path(repos_txt_path).resolve()
         current_dir = Path.cwd().resolve()
-        temp_dirs = [Path('/tmp'), Path('/var/folders'), Path('/private/var/folders')]  # Common temp dirs
+        temp_dirs = [Path("/tmp"), Path("/var/folders"), Path("/private/var/folders")]  # Common temp dirs
 
         # Allow files in current directory or standard temp directories (for testing)
         is_temp_dir = any(safe_path.is_relative_to(temp_dir) for temp_dir in temp_dirs)
@@ -213,7 +207,7 @@ def calculate_dynamic_timeout(file_path: str, base_timeout: int = 300, min_timeo
 
         # Apply a square root scaling to prevent extremely large timeouts for huge files
         # This means a 4x larger file gets 2x timeout, not 4x timeout
-        adjusted_timeout = base_timeout * (scaling_factor ** 0.5)
+        adjusted_timeout = base_timeout * (scaling_factor**0.5)
 
         # Clamp to min/max bounds
         return int(max(min_timeout, min(adjusted_timeout, max_timeout)))
@@ -237,7 +231,7 @@ def smart_split_code(content: str, max_context_tokens: int, overlap_ratio: float
     if estimate_tokens(content) <= max_context_tokens:
         return [content]
 
-    lines = content.split('\n')
+    lines = content.split("\n")
     chunks = []
     current_chunk = []
     current_token_count = 0
@@ -251,14 +245,14 @@ def smart_split_code(content: str, max_context_tokens: int, overlap_ratio: float
 
         # If adding this line would exceed the limit, finalize current chunk
         if current_token_count + line_tokens > max_chunk_tokens and current_chunk:
-            chunk_content = '\n'.join(current_chunk)
+            chunk_content = "\n".join(current_chunk)
             chunks.append(chunk_content)
 
             # Add overlap if needed
             overlap_size = int(len(current_chunk) * overlap_ratio)
             if overlap_size > 0:
                 current_chunk = current_chunk[-overlap_size:]
-                current_token_count = estimate_tokens('\n'.join(current_chunk))
+                current_token_count = estimate_tokens("\n".join(current_chunk))
             else:
                 current_chunk = []
                 current_token_count = 0
@@ -269,7 +263,7 @@ def smart_split_code(content: str, max_context_tokens: int, overlap_ratio: float
 
     # Add the final chunk if it has content
     if current_chunk:
-        chunks.append('\n'.join(current_chunk))
+        chunks.append("\n".join(current_chunk))
 
     return chunks
 
@@ -286,9 +280,9 @@ def identify_key_sections(content: str, section_types: list[str] = None) -> list
         List of important code sections
     """
     if section_types is None:
-        section_types = ['def ', 'function', 'class ', 'if ', 'for ', 'while ', '# ']
+        section_types = ["def ", "function", "class ", "if ", "for ", "while ", "# "]
 
-    lines = content.split('\n')
+    lines = content.split("\n")
     sections = []
     current_section = []
 
@@ -299,11 +293,7 @@ def identify_key_sections(content: str, section_types: list[str] = None) -> list
         if is_key_line:
             # If we have a previous section, save it
             if current_section:
-                sections.append('\n'.join(current_section))
-
-            # Start new section with this line and context
-            context_start = max(0, lines.index(line) - 3)  # 3 lines before
-            context_end = min(len(lines), lines.index(line) + 15)  # 15 lines after
+                sections.append("\n".join(current_section))
 
             # Get surrounding context
             section_start_idx = max(0, lines.index(line) - 3)
@@ -312,13 +302,13 @@ def identify_key_sections(content: str, section_types: list[str] = None) -> list
             current_section = lines[section_start_idx:section_end_idx]
         elif current_section and not line.strip():
             # If we're in a section and hit empty line, consider ending it
-            if len([l for l in current_section if l.strip()]) > 10:  # If section is substantial
-                sections.append('\n'.join(current_section))
+            if len([line_content for line_content in current_section if line_content.strip()]) > 10:  # If section is substantial
+                sections.append("\n".join(current_section))
                 current_section = []
 
     # Add final section if it exists
     if current_section:
-        sections.append('\n'.join(current_section))
+        sections.append("\n".join(current_section))
 
     return sections
 
@@ -389,12 +379,7 @@ def get_repos_from_github_page(org_url: str) -> list[str]:
     repo_links = set()
 
     try:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-            )
-        }
+        headers = {"User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")}
         # Add timeout to prevent hanging requests
         response = requests.get(org_url, headers=headers, timeout=30)
         response.raise_for_status()
@@ -434,7 +419,7 @@ def _run_git_command(cmd: list[str], cwd: str | None = None) -> tuple[bool, str]
     for item in cmd:
         if not isinstance(item, str):
             return (False, f"Command contains non-string element: {item}")
-        if any(char in item for char in ['&', '|', ';', '$', '`']):
+        if any(char in item for char in ["&", "|", ";", "$", "`"]):
             return (False, f"Command contains potentially dangerous characters: {item}")
 
     try:
@@ -471,7 +456,7 @@ def clone_or_update_repos(repos_dir: str, repo_urls: list[str], progress_callbac
     try:
         repos_path = Path(repos_dir).resolve()
         current_dir = Path.cwd().resolve()
-        temp_dirs = [Path('/tmp'), Path('/var/folders'), Path('/private/var/folders')]  # Common temp dirs
+        temp_dirs = [Path("/tmp"), Path("/var/folders"), Path("/private/var/folders")]  # Common temp dirs
 
         # Allow repos in current directory or standard temp directories (for testing)
         is_temp_dir = any(repos_path.is_relative_to(temp_dir) for temp_dir in temp_dirs)

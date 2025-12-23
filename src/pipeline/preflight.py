@@ -186,9 +186,7 @@ class PreflightValidator:
                 check.message = f"{percent}% (sufficient)"
             else:
                 check.status = "warning"
-                check.message = (
-                    f"{percent}% (below {self.config.model.battery.low_threshold}% threshold, will pause during processing)"
-                )
+                check.message = f"{percent}% (below {self.config.model.battery.low_threshold}% threshold, will pause during processing)"
 
         self.checks.append(check)
 
@@ -268,9 +266,8 @@ class PreflightValidator:
 
     def _check_repos_txt(self):
         """Check if repos.txt exists and is valid."""
-        check = PreflightCheck(name="repos.txt", severity="error")
-
-        repos_file = Path(self.config.model.base_dir) / "repos.txt"
+        check = PreflightCheck(name="Repositories List", severity="error")
+        repos_file = Path(self.config.model.pipeline.base_dir) / "repos.txt"
 
         if not repos_file.exists():
             check.status = "fail"
@@ -384,3 +381,16 @@ def run_preflight_checks(config: AppConfig, data_dir: Path, command: str = "prep
     """
     validator = PreflightValidator(config, data_dir, command)
     return validator.run_all_checks()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run pre-flight checks for the pipeline")
+    parser.add_argument("--command", default="prepare", help="Command to check for (prepare, scrape, export)")
+    parser.add_argument("--data-dir", default="data", help="Data directory")
+    args = parser.parse_args()
+
+    config = AppConfig()
+    success = run_preflight_checks(config, Path(args.data_dir), args.command)
+    sys.exit(0 if success else 1)

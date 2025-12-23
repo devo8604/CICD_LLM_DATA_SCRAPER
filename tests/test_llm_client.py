@@ -7,7 +7,22 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 import httpx
 import pytest
 
+from src.core.config import AppConfig
 from src.llm.llm_client import LLMClient
+
+
+def create_test_config():
+    """Create a configured mock config for testing."""
+    config = MagicMock(spec=AppConfig)
+    config.model.generation.default_max_tokens = 4096
+    config.model.generation.min_answer_context_tokens = 256
+    config.model.generation.max_answer_context_tokens = 1024
+    config.model.generation.min_question_tokens = 25
+    config.model.generation.max_question_tokens = 75
+    config.model.pipeline.prompt_theme = "devops"
+    config.model.llm.model_cache_ttl = 300
+    config.model.llm.request_timeout = 300
+    return config
 
 
 class MockClient:
@@ -63,23 +78,21 @@ class MockStreamResponse:
 class TestLLMClientInitialization:
     """Test cases for LLMClient initialization."""
 
-    @patch("src.llm.llm_client.LLMClient._get_available_llm_models_sync_wrapper")
-    def test_successful_initialization(self, mock_wrapper):
-        """Test successful LLMClient initialization with available models."""
-        # Mock the model list response
-        mock_wrapper.return_value = ["model1", "model2", "test-model"]
+    def test_lazy_initialization(self):
+        """Test that LLMClient does not fetch models during __init__."""
+        with patch("src.llm.llm_client.LLMClient._get_available_llm_models_sync_wrapper") as mock_wrapper:
+            client = LLMClient(
+                base_url="http://localhost:8000",
+                model_name="test-model",
+                max_retries=3,
+                retry_delay=5,
+                config=create_test_config(),
+            )
 
-        client = LLMClient(
-            base_url="http://localhost:8000",
-            model_name="test-model",
-            max_retries=3,
-            retry_delay=5,
-        )
-
-        assert client.base_url == "http://localhost:8000"
-        assert client.model_name == "test-model"
-        assert client.max_retries == 3
-        assert client.retry_delay == 5
+            assert client.base_url == "http://localhost:8000"
+            assert client.model_name == "test-model"
+            assert client._initialized is False
+            mock_wrapper.assert_not_called()
 
     @patch("src.llm.llm_client.LLMClient._get_available_llm_models_sync_wrapper")
     def test_initialization_with_unavailable_model(self, mock_wrapper):
@@ -92,38 +105,51 @@ class TestLLMClientInitialization:
             model_name="unavailable-model",
             max_retries=3,
             retry_delay=5,
+            config=create_test_config(),
         )
+
+        # Access property to trigger lazy initialization
+        _ = client.context_window
 
         # Should fall back to first available model
         assert client.model_name == "model1"
+        assert client._initialized is True
 
     @patch("src.llm.llm_client.LLMClient._get_available_llm_models_sync_wrapper")
     def test_initialization_with_no_models(self, mock_wrapper):
-        """Test initialization when no models are available."""
+        """Test initialization fails when no models are available."""
         # Mock empty model list
         mock_wrapper.return_value = []
 
+        client = LLMClient(
+            base_url="http://localhost:8000",
+            model_name="test-model",
+            max_retries=3,
+            retry_delay=5,
+            config=create_test_config(),
+        )
+
         with pytest.raises(ValueError, match="No usable LLM model available"):
-            LLMClient(
-                base_url="http://localhost:8000",
-                model_name="test-model",
-                max_retries=3,
-                retry_delay=5,
-            )
+            # Access property to trigger lazy initialization
+            _ = client.context_window
 
     @patch("src.llm.llm_client.LLMClient._get_available_llm_models_sync_wrapper")
     def test_initialization_with_connection_error(self, mock_wrapper):
-        """Test initialization when unable to connect to server."""
+        """Test initialization fails when unable to connect to server."""
         # Mock connection failure
-        mock_wrapper.return_value = []
+        mock_wrapper.side_effect = Exception("Connection failed")
 
-        with pytest.raises(ValueError, match="No usable LLM model available"):
-            LLMClient(
-                base_url="http://localhost:8000",
-                model_name="test-model",
-                max_retries=3,
-                retry_delay=5,
-            )
+        client = LLMClient(
+            base_url="http://localhost:8000",
+            model_name="test-model",
+            max_retries=3,
+            retry_delay=5,
+            config=create_test_config(),
+        )
+
+        with pytest.raises(Exception, match="Connection failed"):
+            # Access property to trigger lazy initialization
+            _ = client.context_window
 
 
 class TestLLMClientModelList:
@@ -145,6 +171,7 @@ class TestLLMClientModelList:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Create a client for testing
@@ -176,6 +203,7 @@ class TestLLMClientModelList:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         with patch("httpx.Client", return_value=mock_client_instance):
@@ -201,6 +229,7 @@ class TestLLMClientModelList:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Now, for the actual _get_available_llm_models call, we mock its internal cache state
@@ -241,6 +270,7 @@ class TestLLMClientModelList:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Clear cache
@@ -266,6 +296,7 @@ class TestLLMClientModelList:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Clear cache
@@ -296,6 +327,7 @@ class TestLLMClientModelList:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Clear cache
@@ -331,6 +363,7 @@ class TestLLMClientAPICall:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         with patch("httpx.Client") as mock_client_class:
@@ -362,7 +395,8 @@ class TestLLMClientAPICall:
                 base_url="http://localhost:8000",
                 model_name="model1",
                 max_retries=3,
-                retry_delay=1,  # Short delay for testing
+                retry_delay=1,
+                config=create_test_config(),  # Short delay for testing
             )
 
         call_count = 0
@@ -404,6 +438,7 @@ class TestLLMClientAPICall:
                 model_name="model1",
                 max_retries=2,
                 retry_delay=0.1,
+                config=create_test_config(),
             )
 
         with patch("httpx.Client") as mock_client_class:
@@ -438,6 +473,7 @@ class TestLLMClientAPICall:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         with patch("httpx.Client") as mock_client_class:
@@ -468,11 +504,11 @@ class TestLLMClientQuestionGeneration:
         # Use longer questions (> 100 chars) to pass length filter
         q1 = "How does the initialization of the LLMClient handle the case where the requested model is not found on the server?"
         q2 = "What is the primary difference between the streaming and non-streaming response handling in the internal API call method?"
-        
+
         # Construct data strings manually to avoid f-string escaping issues
-        d1 = 'data: ' + json.dumps({"choices": [{"delta": {"content": q1}}]})
-        d2 = 'data: ' + json.dumps({"choices": [{"delta": {"content": "\n" + q2}}]})
-        
+        d1 = "data: " + json.dumps({"choices": [{"delta": {"content": q1}}]})
+        d2 = "data: " + json.dumps({"choices": [{"delta": {"content": "\n" + q2}}]})
+
         stream_data = [d1, d2, "data: [DONE]"]
         mock_stream = MockStreamResponse(mock_data=stream_data)
 
@@ -485,19 +521,20 @@ class TestLLMClientQuestionGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
-        with patch("httpx.Client") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_stream_ctx_manager = MagicMock()
-            mock_stream_ctx_manager.__enter__.return_value = mock_stream
-            mock_client_instance.stream.return_value = mock_stream_ctx_manager
+            with patch("httpx.Client") as mock_client_class:
+                mock_client_instance = MagicMock()
+                mock_stream_ctx_manager = MagicMock()
+                mock_stream_ctx_manager.__enter__.return_value = mock_stream
+                mock_client_instance.stream.return_value = mock_stream_ctx_manager
 
-            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__exit__ = MagicMock(return_value=None)
-            mock_client_class.return_value = mock_client_instance
+                mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+                mock_client_instance.__exit__ = MagicMock(return_value=None)
+                mock_client_class.return_value = mock_client_instance
 
-            questions = client.generate_questions(text="Test code snippet", temperature=0.7, max_tokens=100)
+                questions = client.generate_questions(text="Test code snippet", temperature=0.7, max_tokens=100)
 
         assert questions is not None
         assert len(questions) == 2
@@ -515,10 +552,11 @@ class TestLLMClientQuestionGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
-        with patch.object(client, "_call_llm_api", return_value=None):
-            questions = client.generate_questions(text="Test code snippet", temperature=0.7, max_tokens=100)
+            with patch.object(client, "_call_llm_api", return_value=None):
+                questions = client.generate_questions(text="Test code snippet", temperature=0.7, max_tokens=100)
 
         assert questions is None
 
@@ -527,11 +565,11 @@ class TestLLMClientQuestionGeneration:
         q1 = "How does the initialization of the LLMClient handle the case where the requested model is not found on the server?"
         q2 = "What is the primary difference between the streaming and non-streaming response handling in the internal API call method?"
         statement = "This is a very long statement that is definitely longer than one hundred characters but it does not end with a question mark so it should be filtered."
-        
-        d1 = 'data: ' + json.dumps({"choices": [{"delta": {"content": q1}}]})
-        ds = 'data: ' + json.dumps({"choices": [{"delta": {"content": "\n" + statement}}]})
-        d2 = 'data: ' + json.dumps({"choices": [{"delta": {"content": "\n" + q2}}]})
-        
+
+        d1 = "data: " + json.dumps({"choices": [{"delta": {"content": q1}}]})
+        ds = "data: " + json.dumps({"choices": [{"delta": {"content": "\n" + statement}}]})
+        d2 = "data: " + json.dumps({"choices": [{"delta": {"content": "\n" + q2}}]})
+
         stream_data = [d1, ds, d2, "data: [DONE]"]
         mock_stream = MockStreamResponse(mock_data=stream_data)
 
@@ -544,19 +582,20 @@ class TestLLMClientQuestionGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
-        with patch("httpx.Client") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_stream_ctx_manager = MagicMock()
-            mock_stream_ctx_manager.__enter__.return_value = mock_stream
-            mock_client_instance.stream.return_value = mock_stream_ctx_manager
+            with patch("httpx.Client") as mock_client_class:
+                mock_client_instance = MagicMock()
+                mock_stream_ctx_manager = MagicMock()
+                mock_stream_ctx_manager.__enter__.return_value = mock_stream
+                mock_client_instance.stream.return_value = mock_stream_ctx_manager
 
-            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__exit__ = MagicMock(return_value=None)
-            mock_client_class.return_value = mock_client_instance
+                mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+                mock_client_instance.__exit__ = MagicMock(return_value=None)
+                mock_client_class.return_value = mock_client_instance
 
-            questions = client.generate_questions(text="Test code snippet", temperature=0.7, max_tokens=100)
+                questions = client.generate_questions(text="Test code snippet", temperature=0.7, max_tokens=100)
 
         # Should only include lines ending with '?'
         assert len(questions) == 2
@@ -566,8 +605,8 @@ class TestLLMClientQuestionGeneration:
         """Test that question generation strictly enforces a maximum of 5 questions."""
         qs = [f"This is question number {i} and it is long enough to pass the length requirement filter, don't you think?" for i in range(1, 7)]
         content = "\n".join(qs)
-        
-        d = 'data: ' + json.dumps({"choices": [{"delta": {"content": content}}]})
+
+        d = "data: " + json.dumps({"choices": [{"delta": {"content": content}}]})
         stream_data = [d, "data: [DONE]"]
         mock_stream = MockStreamResponse(mock_data=stream_data)
 
@@ -580,19 +619,20 @@ class TestLLMClientQuestionGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
-        with patch("httpx.Client") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_stream_ctx_manager = MagicMock()
-            mock_stream_ctx_manager.__enter__.return_value = mock_stream
-            mock_client_instance.stream.return_value = mock_stream_ctx_manager
+            with patch("httpx.Client") as mock_client_class:
+                mock_client_instance = MagicMock()
+                mock_stream_ctx_manager = MagicMock()
+                mock_stream_ctx_manager.__enter__.return_value = mock_stream
+                mock_client_instance.stream.return_value = mock_stream_ctx_manager
 
-            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__exit__ = MagicMock(return_value=None)
-            mock_client_class.return_value = mock_client_instance
+                mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+                mock_client_instance.__exit__ = MagicMock(return_value=None)
+                mock_client_class.return_value = mock_client_instance
 
-            questions = client.generate_questions(text="Test content", temperature=0.7, max_tokens=100)
+                questions = client.generate_questions(text="Test content", temperature=0.7, max_tokens=100)
 
         # Should be exactly 5 even if LLM provided 6
         assert len(questions) == 5
@@ -620,24 +660,25 @@ class TestLLMClientAnswerGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
-        with patch("httpx.Client") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_stream_ctx_manager = MagicMock()
-            mock_stream_ctx_manager.__enter__.return_value = mock_stream
-            mock_client_instance.stream.return_value = mock_stream_ctx_manager
+            with patch("httpx.Client") as mock_client_class:
+                mock_client_instance = MagicMock()
+                mock_stream_ctx_manager = MagicMock()
+                mock_stream_ctx_manager.__enter__.return_value = mock_stream
+                mock_client_instance.stream.return_value = mock_stream_ctx_manager
 
-            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__exit__ = MagicMock(return_value=None)
-            mock_client_class.return_value = mock_client_instance
+                mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+                mock_client_instance.__exit__ = MagicMock(return_value=None)
+                mock_client_class.return_value = mock_client_instance
 
-            answer = client.get_answer_single(
-                question="What is this?",
-                context="Test context",
-                temperature=0.7,
-                max_tokens=100,
-            )
+                answer = client.get_answer_single(
+                    question="What is this?",
+                    context="Test context",
+                    temperature=0.7,
+                    max_tokens=100,
+                )
 
         assert answer == "This is the answer."
 
@@ -652,15 +693,16 @@ class TestLLMClientAnswerGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
-        with patch.object(client, "_call_llm_api", return_value=None):
-            answer = client.get_answer_single(
-                question="What is this?",
-                context="Test context",
-                temperature=0.7,
-                max_tokens=100,
-            )
+            with patch.object(client, "_call_llm_api", return_value=None):
+                answer = client.get_answer_single(
+                    question="What is this?",
+                    context="Test context",
+                    temperature=0.7,
+                    max_tokens=100,
+                )
 
         assert answer is None
 
@@ -675,6 +717,7 @@ class TestLLMClientAnswerGeneration:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Mock get_answer_single to return different answers
@@ -710,6 +753,7 @@ class TestLLMClientUtilities:
                 model_name="model1",
                 max_retries=3,
                 retry_delay=5,
+                config=create_test_config(),
             )
 
         # Should not raise any errors

@@ -158,7 +158,7 @@ Output: Formatted training data (JSONL)
    - Output: Multiple technical questions
    - Prompt: "Analyze this code and generate 5 specific technical questions"
 
-2. **Answer Generation**  
+2. **Answer Generation**
    - Input: Source code + each question
    - Output: Detailed answer
    - Prompt: "Answer the question using ONLY the provided context"
@@ -178,8 +178,8 @@ Output: Formatted training data (JSONL)
 ### Configuration Management
 - Pydantic-based configuration model with validation
 - Access to configuration via `config.model` property
-- No backward-compatible property accessors
-- Strict requirement for configuration to be provided to services
+- Support for backward-compatible property accessors in `AppConfig` (e.g., `config.DB_PATH`)
+- Configuration is provided to services via dependency injection or direct passing
 
 ## TUI Interface
 

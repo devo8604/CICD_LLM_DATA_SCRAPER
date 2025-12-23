@@ -95,22 +95,10 @@ class TrainingDataRepository:
 
             # Create indexes for performance optimization
             # These use IF NOT EXISTS so they're safe to run on every connection
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_training_samples_dataset_source "
-                "ON TrainingSamples(dataset_source)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_conversation_turns_sample_id "
-                "ON ConversationTurns(sample_id)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_conversation_turns_role "
-                "ON ConversationTurns(role)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_file_hashes_file_path "
-                "ON FileHashes(file_path)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_training_samples_dataset_source ON TrainingSamples(dataset_source)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conversation_turns_sample_id ON ConversationTurns(sample_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conversation_turns_role ON ConversationTurns(role)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_file_hashes_file_path ON FileHashes(file_path)")
         logger.debug("Ensured TrainingDataRepository tables and indexes exist")
 
     def add_failed_file(self, file_path: str, reason: str) -> None:
@@ -203,33 +191,19 @@ class TrainingDataRepository:
         """Get SHA256 hashes of all processed questions for a file."""
         with self.get_connection() as conn:
             cursor = conn.execute(
-                "SELECT sample_id FROM TrainingSamples WHERE dataset_source LIKE ?",
+                """
+                SELECT CT1.content
+                FROM ConversationTurns CT1
+                JOIN TrainingSamples TS ON CT1.sample_id = TS.sample_id
+                JOIN ConversationTurns CT2 ON TS.sample_id = CT2.sample_id
+                WHERE TS.dataset_source LIKE ?
+                  AND CT1.role = 'user'
+                  AND CT2.role = 'assistant'
+                """,
                 (f"repo_file:{file_path}%",),
             )
-            sample_ids_for_file = {row[0] for row in cursor.fetchall()}
 
-            if not sample_ids_for_file:
-                return set()
-
-            # Instead of using IN with dynamic placeholders, iterate through sample_ids
-            # and collect content individually to avoid dynamic query building
-            questions = set()
-            for sample_id in sample_ids_for_file:
-                cursor = conn.execute(
-                    """
-                    SELECT T1.content
-                    FROM ConversationTurns T1
-                    INNER JOIN ConversationTurns T2
-                    ON T1.sample_id = T2.sample_id
-                    WHERE T1.sample_id = ? AND T1.role = 'user' AND T2.role = 'assistant'
-                """,
-                    (sample_id,),
-                )
-
-                for row in cursor.fetchall():
-                    questions.add(hashlib.sha256(row[0].encode("utf-8")).hexdigest())
-
-            return questions
+            return {hashlib.sha256(row[0].encode("utf-8")).hexdigest() for row in cursor.fetchall()}
 
     def get_file_hash(self, file_path: str) -> str | None:
         """Get stored hash for a file."""
@@ -264,22 +238,28 @@ class TrainingDataRepository:
 
     def delete_samples_for_file(self, file_path: str) -> None:
         """Delete all samples and conversation turns for a removed file."""
+        source_pattern = f"repo_file:{file_path}%"
         with self.get_connection() as conn:
-            cursor = conn.execute(
-                "SELECT sample_id FROM TrainingSamples WHERE dataset_source LIKE ?",
-                (f"repo_file:{file_path}%",),
+            # Delete conversation turns first due to foreign key (if enabled)
+            conn.execute(
+                """
+                DELETE FROM ConversationTurns
+                WHERE sample_id IN (
+                    SELECT sample_id FROM TrainingSamples
+                    WHERE dataset_source LIKE ?
+                )
+                """,
+                (source_pattern,),
             )
-            sample_ids = [row[0] for row in cursor.fetchall()]
 
-            if sample_ids:
-                # Delete related conversation turns first
-                for sample_id in sample_ids:
-                    conn.execute("DELETE FROM ConversationTurns WHERE sample_id = ?", (sample_id,))
+            # Then delete training samples
+            cursor = conn.execute(
+                "DELETE FROM TrainingSamples WHERE dataset_source LIKE ?",
+                (source_pattern,),
+            )
+            deleted_count = cursor.rowcount
 
-                # Then delete the training samples
-                for sample_id in sample_ids:
-                    conn.execute("DELETE FROM TrainingSamples WHERE sample_id = ?", (sample_id,))
-        logger.info("Deleted samples for removed file", file_path=file_path, count=len(sample_ids))
+        logger.info("Deleted samples for removed file", file_path=file_path, count=deleted_count)
 
     def get_all_training_samples(self) -> list[dict[str, any]]:
         """Retrieve all training samples and their conversation turns."""

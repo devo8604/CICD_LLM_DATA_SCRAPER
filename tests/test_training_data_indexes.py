@@ -1,8 +1,5 @@
 """Test database indexes for TrainingDataRepository."""
 
-import sqlite3
-from pathlib import Path
-
 import pytest
 
 from src.data.training_data_repository import TrainingDataRepository
@@ -20,9 +17,7 @@ def test_indexes_created_on_initialization(temp_db):
     repo = TrainingDataRepository(temp_db)
 
     with repo.get_connection() as conn:
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")
         indexes = {row[0] for row in cursor.fetchall()}
 
     expected_indexes = {
@@ -32,9 +27,7 @@ def test_indexes_created_on_initialization(temp_db):
         "idx_file_hashes_file_path",
     }
 
-    assert expected_indexes.issubset(
-        indexes
-    ), f"Missing indexes: {expected_indexes - indexes}"
+    assert expected_indexes.issubset(indexes), f"Missing indexes: {expected_indexes - indexes}"
 
 
 def test_indexes_idempotent(temp_db):
@@ -60,18 +53,12 @@ def test_dataset_source_index_improves_queries(temp_db):
 
     with repo.get_connection() as conn:
         # Check query plan for dataset_source lookup
-        cursor = conn.execute(
-            "EXPLAIN QUERY PLAN SELECT sample_id FROM TrainingSamples "
-            "WHERE dataset_source LIKE 'repo_file:test.py%'"
-        )
+        cursor = conn.execute("EXPLAIN QUERY PLAN SELECT sample_id FROM TrainingSamples WHERE dataset_source LIKE 'repo_file:test.py%'")
         plan = cursor.fetchall()
 
         # Verify index is being used
         plan_str = str(plan).lower()
-        assert (
-            "idx_training_samples_dataset_source" in plan_str
-            or "using index" in plan_str
-        ), f"Index not used in query plan: {plan}"
+        assert "idx_training_samples_dataset_source" in plan_str or "using index" in plan_str, f"Index not used in query plan: {plan}"
 
 
 def test_sample_id_index_exists(temp_db):
@@ -80,10 +67,7 @@ def test_sample_id_index_exists(temp_db):
 
     with repo.get_connection() as conn:
         # Verify index exists
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='index' AND name='idx_conversation_turns_sample_id'"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_conversation_turns_sample_id'")
         result = cursor.fetchone()
         assert result is not None, "idx_conversation_turns_sample_id index not found"
 
@@ -91,10 +75,7 @@ def test_sample_id_index_exists(temp_db):
         repo.add_qa_sample("test.py", "Q1", "A1")
 
         # Test that JOIN works correctly (index will be used for larger datasets)
-        cursor = conn.execute(
-            "SELECT * FROM TrainingSamples AS TS "
-            "JOIN ConversationTurns AS CT ON TS.sample_id = CT.sample_id"
-        )
+        cursor = conn.execute("SELECT * FROM TrainingSamples AS TS JOIN ConversationTurns AS CT ON TS.sample_id = CT.sample_id")
         results = cursor.fetchall()
         assert len(results) > 0, "JOIN query returned no results"
 
@@ -105,11 +86,7 @@ def test_all_indexes_exist_after_initialization(temp_db):
 
     with repo.get_connection() as conn:
         # Get all indexes
-        cursor = conn.execute(
-            "SELECT name, tbl_name FROM sqlite_master "
-            "WHERE type='index' AND sql IS NOT NULL "
-            "ORDER BY name"
-        )
+        cursor = conn.execute("SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name")
         indexes = cursor.fetchall()
 
     # Convert to dict for easier checking

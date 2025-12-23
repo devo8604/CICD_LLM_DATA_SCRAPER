@@ -21,8 +21,23 @@ class FileManager:
         self.repos_dir = Path(repos_dir)
         self.max_file_size = max_file_size
         self.allowed_extensions = allowed_extensions or [
-            ".py", ".js", ".ts", ".go", ".rs", ".c", ".cpp", ".h", ".hpp", 
-            ".java", ".rb", ".php", ".sh", ".yaml", ".yml", ".sql", ".md"
+            ".py",
+            ".js",
+            ".ts",
+            ".go",
+            ".rs",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".java",
+            ".rb",
+            ".php",
+            ".sh",
+            ".yaml",
+            ".yml",
+            ".sql",
+            ".md",
         ]
         self.allowed_json_md_files = allowed_json_md_files or ["readme.md", "README.md", "readme.txt"]
 
@@ -39,12 +54,9 @@ class FileManager:
         all_files_in_repo = []
         skipped_count_in_repo = 0
         current_repo_path = Path(current_repo_path)
-        
+
         # Directories to ignore
-        IGNORED_DIRS = {
-            "node_modules", "__pycache__", "venv", "env", ".git", ".idea", ".vscode", 
-            "dist", "build", "target", "vendor", "bin", "obj", "out"
-        }
+        IGNORED_DIRS = {"node_modules", "__pycache__", "venv", "env", ".git", ".idea", ".vscode", "dist", "build", "target", "vendor", "bin", "obj", "out"}
 
         try:
             for root, dirs, files in os.walk(current_repo_path):
@@ -65,10 +77,7 @@ class FileManager:
 
                     try:
                         if file_path.stat().st_size > self.max_file_size:
-                            logging.debug(
-                                f"    Skipping large file (>{self.max_file_size / (1024 * 1024):.1f}MB): "
-                                f"{file_path.name}"
-                            )
+                            logging.debug(f"    Skipping large file (>{self.max_file_size / (1024 * 1024):.1f}MB): {file_path.name}")
                             skipped_count_in_repo += 1
                             continue
                     except OSError:
@@ -90,7 +99,7 @@ class FileManager:
                                 break
 
                     # For JSON and MD files specifically, only allow if they're explicitly in allowed_json_md_files
-                    if filename.endswith(('.json', '.md')):
+                    if filename.endswith((".json", ".md")):
                         if filename not in self.allowed_json_md_files:
                             allowed = False
 
@@ -102,24 +111,21 @@ class FileManager:
         except Exception as e:
             logging.error(f"Error scanning repository {current_repo_path}: {e}")
 
-        logging.info(
-            f"Finished scanning {current_repo_path}. Found {len(all_files_in_repo)} files for processing. "
-            f"{skipped_count_in_repo} files filtered out."
-        )
+        logging.info(f"Finished scanning {current_repo_path}. Found {len(all_files_in_repo)} files for processing. {skipped_count_in_repo} files filtered out.")
         all_files_in_repo.sort()
         return all_files_in_repo
 
     def cleanup_temporary_artifacts(self) -> int:
         """
         Cleanup empty directories and other artifacts.
-        
+
         Returns:
             Number of items removed.
         """
         removed_count = 0
         if not self.repos_dir.exists():
             return 0
-            
+
         # Walk bottom-up to remove leaf directories first
         for root, dirs, files in os.walk(self.repos_dir, topdown=False):
             for d in dirs:
@@ -132,5 +138,5 @@ class FileManager:
                         logging.debug(f"Removed empty directory: {dir_path}")
                 except OSError as e:
                     logging.warning(f"Failed to remove directory {dir_path}: {e}")
-                    
+
         return removed_count

@@ -26,7 +26,7 @@ T = TypeVar("T")
 
 # Protocol for service factories
 class ServiceFactory(Protocol):
-    def __call__(self, container: DIContainer) -> Any: ...
+    def __call__(self, container: "DIContainer") -> Any: ...
 
 
 class DIContainer:
@@ -85,7 +85,13 @@ class DIContainer:
     def config(self) -> AppConfig:
         """Get the application configuration."""
         if self._config is None:
-            self._config = AppConfig()
+            # Check if we have it in services (registered as singleton)
+            if AppConfig in self._services:
+                self._config = self._services[AppConfig]
+            else:
+                self._config = AppConfig()
+                # Store in services to ensure singleton behavior
+                self._services[AppConfig] = self._config
         return self._config
 
     @property
@@ -107,7 +113,7 @@ def create_file_manager(container: DIContainer) -> FileManager:
     """Factory function for FileManager."""
     config = container.config
     return FileManager(
-        repos_dir=config.model.pipeline.repos_dir,
+        repos_dir=config.REPOS_DIR,
         max_file_size=config.model.pipeline.max_file_size,
         allowed_extensions=config.model.pipeline.allowed_extensions,
         allowed_json_md_files=config.model.pipeline.allowed_json_md_files,

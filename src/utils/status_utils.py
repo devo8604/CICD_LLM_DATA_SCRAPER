@@ -69,11 +69,10 @@ class PipelineStatus:
 
     def get_repository_count(self) -> int:
         """Count repositories in repos directory."""
-        repos_dir = Path(self.config.model.base_dir) / self.config.model.pipeline.repos_dir_name
+        repos_dir = Path(self.config.model.pipeline.base_dir) / self.config.model.pipeline.repos_dir_name
         if not repos_dir.exists():
             return 0
 
-        # Count directories (excluding hidden ones)
         count = 0
         for org_dir in repos_dir.iterdir():
             if org_dir.is_dir() and not org_dir.name.startswith("."):
@@ -92,12 +91,13 @@ class PipelineStatus:
 
     def get_repos_txt_count(self) -> int:
         """Count repositories listed in repos.txt."""
-        repos_file = Path(self.config.model.base_dir) / "repos.txt"
+        repos_file = Path(self.config.model.pipeline.base_dir) / "repos.txt"
+
         if not repos_file.exists():
             return 0
 
         try:
-            with open(repos_file) as f:
+            with open(repos_file, encoding="utf-8", errors="replace") as f:
                 lines = [line.strip() for line in f if line.strip() and not line.startswith("#")]
                 return len(lines)
         except Exception:
@@ -339,17 +339,9 @@ class PipelineStatistics:
         import json
 
         stats = {
-            "repositories": [
-                {"repo": repo, "samples": samples, "turns": turns}
-                for repo, samples, turns in self.get_repository_breakdown()
-            ],
-            "quality_distribution": [
-                {"score": score, "count": count} for score, count in self.get_quality_distribution()
-            ],
-            "failed_files": [
-                {"file": file_path, "reason": reason, "failed_at": failed_at}
-                for file_path, reason, failed_at in self.get_failed_files_details()
-            ],
+            "repositories": [{"repo": repo, "samples": samples, "turns": turns} for repo, samples, turns in self.get_repository_breakdown()],
+            "quality_distribution": [{"score": score, "count": count} for score, count in self.get_quality_distribution()],
+            "failed_files": [{"file": file_path, "reason": reason, "failed_at": failed_at} for file_path, reason, failed_at in self.get_failed_files_details()],
         }
 
         self.console.print(json.dumps(stats, indent=2))

@@ -138,11 +138,7 @@ def get_gpu_info() -> dict[str, any]:
                     timeout=5,
                     close_fds=False,
                 )
-                if result.returncode == 0 and (
-                    "arm" in result.stdout.lower()
-                    or "arm64" in result.stdout.lower()
-                    or "aarch64" in result.stdout.lower()
-                ):
+                if result.returncode == 0 and ("arm" in result.stdout.lower() or "arm64" in result.stdout.lower() or "aarch64" in result.stdout.lower()):
                     gpu_info["available"] = True
                     gpu_info["type"] = "apple_silicon"
                     gpu_info["gpus"].append(

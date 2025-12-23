@@ -19,6 +19,15 @@ class TestFileProcessingServiceFull:
         config.DEFAULT_TEMPERATURE = 0.7
         config.DEFAULT_MAX_TOKENS = 500
         config.USE_MLX = False
+
+        # Mock model properties
+        config.model.processing.chunk_read_size = 100
+        config.model.llm.request_timeout = 1
+        config.model.llm.max_retries = 2
+        config.model.generation.default_temperature = 0.7
+        config.model.generation.default_max_tokens = 500
+        config.model.use_mlx = False
+
         return config
 
     @pytest.fixture
@@ -31,7 +40,7 @@ class TestFileProcessingServiceFull:
     def mock_llm(self):
         llm = MagicMock(spec=LLMClient)
         # Ensure it doesn't look like an MLX client unless we want it to
-        if hasattr(llm, 'context_window'):
+        if hasattr(llm, "context_window"):
             del llm.context_window
         return llm
 
@@ -57,6 +66,7 @@ class TestFileProcessingServiceFull:
 
     def test_process_file_context_mlx_clear(self, service):
         service.config.USE_MLX = True
+        service.config.model.use_mlx = True
         service.llm_client.clear_mlx_memory = MagicMock()
         service._processed_count = 9  # Set to 9 so increment makes it 10
 
@@ -148,7 +158,7 @@ class TestFileProcessingServiceFull:
             patch("src.ui.progress_tracker.get_progress_tracker"),
         ):
             # Ensure LLM client is NOT MLX
-            if hasattr(service.llm_client, 'context_window'):
+            if hasattr(service.llm_client, "context_window"):
                 del service.llm_client.context_window
 
             # timeout called for generate_questions then get_answer_single
@@ -163,9 +173,7 @@ class TestFileProcessingServiceFull:
 
             assert success is True
             assert count == 1
-            service.db_manager.training_data_repo.add_qa_samples_batch.assert_called_once_with(
-                "file.txt", [("Q1", "A1")]
-            )
+            service.db_manager.training_data_repo.add_qa_samples_batch.assert_called_once_with("file.txt", [("Q1", "A1")])
             service.db_manager.save_file_hash.assert_called_with("file.txt", "new_hash")
 
     def test_process_single_file_generation_error(self, service):
@@ -178,7 +186,7 @@ class TestFileProcessingServiceFull:
             patch("time.sleep"),
         ):
             # Ensure LLM client is NOT MLX
-            if hasattr(service.llm_client, 'context_window'):
+            if hasattr(service.llm_client, "context_window"):
                 del service.llm_client.context_window
 
             # Raise exception on all attempts
@@ -200,7 +208,7 @@ class TestFileProcessingServiceFull:
             patch("src.ui.progress_tracker.get_progress_tracker"),
         ):
             # Ensure LLM client is NOT MLX
-            if hasattr(service.llm_client, 'context_window'):
+            if hasattr(service.llm_client, "context_window"):
                 del service.llm_client.context_window
 
             # 1. Fail generate, 2. Succeed generate, 3. Succeed answer
@@ -212,6 +220,4 @@ class TestFileProcessingServiceFull:
 
             assert success is True
             assert count == 1
-            service.db_manager.training_data_repo.add_qa_samples_batch.assert_called_once_with(
-                "file.txt", [("Q1", "A1")]
-            )
+            service.db_manager.training_data_repo.add_qa_samples_batch.assert_called_once_with("file.txt", [("Q1", "A1")])

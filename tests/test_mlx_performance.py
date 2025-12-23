@@ -59,7 +59,10 @@ class TestMLXClientPerformance:
             mock_generate.return_value = "Hello"
 
             config = AppConfig()
-            _ = MLXClient(model_name="test-model", config=config)
+            client = MLXClient(model_name="test-model", config=config)
+
+            # Access formatter to trigger lazy loading and thus warmup
+            _ = client.formatter
 
             # Warmup should have been called during initialization
             assert mock_generate.called
@@ -111,11 +114,11 @@ class TestMLXClientPerformance:
 
             # First call - should result in generate call
             prompt = "Test prompt"
-            with patch.object(client, "_generate_text_sync", return_value="Test response") as mock_sync:
+            with patch.object(client, "_generate_text_sync", return_value="Test response"):
                 result1 = client._generate_text_sync(prompt, temperature=0.7, max_tokens=50)
                 # Second call - should be cache hit
                 result2 = client._generate_text_sync(prompt, temperature=0.7, max_tokens=50)
-                
+
                 assert result1 == result2
                 # In our current implementation, _generate_text_sync handles caching internally
                 # and call_count will depend on whether we mock the method or its internals.

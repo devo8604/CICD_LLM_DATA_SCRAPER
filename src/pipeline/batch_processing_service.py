@@ -1,5 +1,6 @@
 """Service layer for batch processing of files."""
 
+import concurrent.futures
 import os
 
 import structlog
@@ -14,7 +15,7 @@ logger = structlog.get_logger(__name__)
 
 
 class BatchProcessingService:
-    """Handles sequential batch processing of files."""
+    """Handles parallel batch processing of files."""
 
     def __init__(
         self,
@@ -35,51 +36,60 @@ class BatchProcessingService:
         repo_file_pbar: tqdm | None = None,
         cancellation_event=None,
     ) -> list[tuple[str, bool, int]]:
-        """Process a batch of files sequentially."""
+        """Process a batch of files in parallel."""
         results = []
 
         logger.info("Processing batch", batch_num=batch_num, total_batches=total_batches, file_count=len(files))
 
-        # Process files sequentially (single-threaded)
-        for i, file_path in enumerate(files):
-            # Check for cancellation
-            if cancellation_event and cancellation_event.is_set():
-                logger.info("Batch processing cancelled")
-                break
+        # Determine number of workers from config
+        max_workers = self.config.model.processing.max_concurrent_files if hasattr(self.config, "model") else 1
 
-            try:
+        # If MLX is being used, parallel processing might be limited by VRAM
+        # but we can still use small concurrency if the model is small enough.
+        # For now, we respect the config.
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Map files to processing tasks
+            future_to_file = {}
+            for file_path in files:
+                if cancellation_event and cancellation_event.is_set():
+                    break
+
+                # Check battery before starting each file task
                 pause_on_low_battery(self.config)
-                # Create a temporary pbar for the individual file's Q/A progress
-                pbar = tqdm(
-                    total=1,
-                    desc=f"Starting {os.path.basename(file_path)[:64]}...",
-                    position=2,  # Fixed position for sequential processing
-                    leave=False,
-                    dynamic_ncols=True,
-                    unit="Q",
-                )
-                success, qa_count = self.file_processing_service.process_single_file(
-                    file_path, repo_name, pbar=pbar, cancellation_event=cancellation_event
-                )
 
-                # Update the main file progress bar for the repo
-                if repo_file_pbar:
-                    repo_file_pbar.update(1)
+                future = executor.submit(
+                    self.file_processing_service.process_single_file,
+                    file_path,
+                    repo_name,
+                    pbar=None,  # Parallel tasks shouldn't share a pbar or use individual ones that mess up the console
+                    cancellation_event=cancellation_event,
+                )
+                future_to_file[future] = file_path
 
-                # Log results after processing
-                if success:
-                    if qa_count > 0:
-                        logger.debug("Processed file", file=os.path.basename(file_path), count=qa_count)
+            # Collect results as they complete
+            for future in concurrent.futures.as_completed(future_to_file):
+                file_path = future_to_file[future]
+                try:
+                    success, qa_count = future.result()
+                    results.append((file_path, success, qa_count))
+
+                    # Update the main file progress bar
+                    if repo_file_pbar:
+                        repo_file_pbar.update(1)
+
+                    if success:
+                        if qa_count > 0:
+                            logger.debug("Processed file", file=os.path.basename(file_path), count=qa_count)
+                        else:
+                            logger.debug("Skipped file", file=os.path.basename(file_path), reason="unchanged or no new Qs")
                     else:
-                        logger.debug("Skipped file", file=os.path.basename(file_path), reason="unchanged or no new Qs")
-                else:
-                    logger.warning("Failed to process file", file=os.path.basename(file_path))
+                        logger.warning("Failed to process file", file=os.path.basename(file_path))
 
-                results.append((file_path, success, qa_count))
-
-            except Exception as e:
-                # Log the error and add a failure result for this file
-                logger.error("Error processing file in batch", file=file_path, error=str(e), exc_info=True)
-                results.append((file_path, False, 0))
+                except Exception as e:
+                    logger.error("Error processing file in batch", file=file_path, error=str(e), exc_info=True)
+                    results.append((file_path, False, 0))
+                    if repo_file_pbar:
+                        repo_file_pbar.update(1)
 
         return results

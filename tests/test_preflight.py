@@ -57,6 +57,14 @@ class TestPreflightValidator:
         config.REPOS_DIR_NAME = "repos"
         config.LOG_FILE_PREFIX = "test_log"
         config.BATTERY_LOW_THRESHOLD = 15
+
+        # Mock model properties
+        config.model.use_mlx = False
+        config.model.llm.base_url = "http://localhost:11454"
+        config.model.llm.request_timeout = 300
+        config.model.battery.low_threshold = 15
+        config.model.pipeline.base_dir = "."
+
         return config
 
     def test_initialization(self, config, temp_data_dir):
@@ -264,6 +272,7 @@ class TestPreflightValidator:
     def test_check_repos_txt_empty(self, config, temp_data_dir):
         """Test repos.txt check with empty file."""
         config.BASE_DIR = str(temp_data_dir)
+        config.model.pipeline.base_dir = str(temp_data_dir)
         repos_file = temp_data_dir / "repos.txt"
         repos_file.write_text("# Just comments\n\n")
 
@@ -277,6 +286,7 @@ class TestPreflightValidator:
     def test_check_repos_txt_valid(self, config, temp_data_dir):
         """Test repos.txt check with valid file."""
         config.BASE_DIR = str(temp_data_dir)
+        config.model.pipeline.base_dir = str(temp_data_dir)
         repos_file = temp_data_dir / "repos.txt"
         repos_file.write_text("https://github.com/user/repo1\n# Comment\nhttps://github.com/user/repo2\n")
 
@@ -319,6 +329,7 @@ class TestPreflightValidator:
     def test_run_all_checks_scrape_command(self, mock_console, config, temp_data_dir):
         """Test running all checks for scrape command."""
         config.BASE_DIR = str(temp_data_dir)
+        config.model.pipeline.base_dir = str(temp_data_dir)
         repos_file = temp_data_dir / "repos.txt"
         repos_file.write_text("https://github.com/user/repo\n")
 
@@ -326,18 +337,24 @@ class TestPreflightValidator:
         with patch.object(validator, "_display_results"):
             _ = validator.run_all_checks()
 
-        # Should check repos.txt, disk space, data dir
-        assert any("repos.txt" in c.name for c in validator.checks)
+        # Should check repos.txt (Repositories List), disk space, data dir
+        assert any("Repositories List" in c.name for c in validator.checks)
+        assert any("Disk Space" in c.name for c in validator.checks)
+        assert any("Data Directory" in c.name for c in validator.checks)
 
     @patch("src.pipeline.preflight.Console")
     def test_run_all_checks_returns_false_on_critical_failure(self, mock_console, config, temp_data_dir):
         """Test that run_all_checks returns False on critical failures."""
         validator = PreflightValidator(config, temp_data_dir, "prepare")
 
-        # Add a critical failure
-        validator.checks = [PreflightCheck(name="Test", status="fail", severity="error")]
+        # Mock one of the checks to fail
+        def mock_fail():
+            validator.checks.append(PreflightCheck(name="Test", status="fail", severity="error"))
 
-        with patch.object(validator, "_display_results"):
+        with (
+            patch.object(validator, "_check_llm_availability", side_effect=mock_fail),
+            patch.object(validator, "_display_results"),
+        ):
             result = validator.run_all_checks()
 
         assert result is False
@@ -359,9 +376,7 @@ class TestPreflightValidator:
                         ]
 
                         # Just check the logic, not the full run
-                        critical_failures = [
-                            c for c in validator.checks if c.status == "fail" and c.severity == "error"
-                        ]
+                        critical_failures = [c for c in validator.checks if c.status == "fail" and c.severity == "error"]
                         result = len(critical_failures) == 0
 
         assert result is True

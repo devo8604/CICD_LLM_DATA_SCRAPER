@@ -2,7 +2,6 @@
 
 import hashlib
 import os
-import threading
 from collections import OrderedDict
 
 import structlog
@@ -10,11 +9,12 @@ import structlog
 # Set tokenizers parallelism to avoid warnings in multiprocessing
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Global lock to ensure MLX operations don't run concurrently
-MLX_LOCK = threading.Lock()
+# Global lock removed to allow concurrent generation on Apple Silicon
+# MLX_LOCK = threading.Lock()
 
 try:
     from mlx_lm import generate
+
     MLX_AVAILABLE = True
 except ImportError:
     MLX_AVAILABLE = False
@@ -43,12 +43,10 @@ class MLXClient(LLMInterface):
     ):
         # Validate platform
         import platform
+
         is_apple_silicon = platform.system() == "Darwin" and ("arm" in platform.machine() or "aarch64" in platform.machine())
         if not is_apple_silicon:
-            raise RuntimeError(
-                "MLX is only supported on Apple Silicon (M1/M2/M3) Macs. "
-                "Please use a different LLM backend for non-Apple Silicon systems."
-            )
+            raise RuntimeError("MLX is only supported on Apple Silicon (M1/M2/M3) Macs. Please use a different LLM backend for non-Apple Silicon systems.")
 
         self.config = config or AppConfig()
         self.model_name = model_name
@@ -56,19 +54,27 @@ class MLXClient(LLMInterface):
         self.retry_delay = retry_delay
         self.prompt_manager = get_prompt_manager(theme=self.config.model.pipeline.prompt_theme)
 
-        # Specialized components
+        # Specialized components (initialized lazily)
         self.model_manager = MLXModelManager(model_name)
-        self.model_manager.load_model()
-        
-        self.formatter = MLXPromptFormatter(
-            self.model_manager.tokenizer, 
-            self.prompt_manager, 
-            self.model_manager.context_window
-        )
+        self._formatter = None
 
         # Initialize cache for better performance
         self._generate_cache = OrderedDict()
         self._cache_size = 256
+
+    def _ensure_initialized(self):
+        """Ensure model is loaded and formatter is created."""
+        if self.model_manager.model is None:
+            self.model_manager.load_model()
+
+        if self._formatter is None:
+            self._formatter = MLXPromptFormatter(self.model_manager.tokenizer, self.prompt_manager, self.model_manager.context_window)
+
+    @property
+    def formatter(self) -> MLXPromptFormatter:
+        """Lazy access to formatter."""
+        self._ensure_initialized()
+        return self._formatter
 
     def generate_questions(
         self,
@@ -79,6 +85,7 @@ class MLXClient(LLMInterface):
     ) -> list[str] | None:
         """Generate questions from code content using MLX."""
         import time
+
         start_time = time.time()
         logger.info("Starting generate_questions", content_length=len(content))
 
@@ -87,7 +94,7 @@ class MLXClient(LLMInterface):
                 pbar.set_description(f"Gen Qs (ctx: {self.context_window}, MLX)")
 
             prompt = self.formatter.format_question_prompt(content, "Generate diverse, specific questions.")
-            
+
             questions_text = self._generate_text_sync(prompt, temperature, max_tokens)
 
             if not questions_text:
@@ -124,6 +131,7 @@ class MLXClient(LLMInterface):
     ) -> str | None:
         """Generate an answer to a question based on context using MLX."""
         import time
+
         start_time = time.time()
         logger.info("Starting get_answer_single", question=question[:50], context_length=len(context))
 
@@ -150,11 +158,10 @@ class MLXClient(LLMInterface):
     def _generate_text_sync(self, prompt: str, temperature: float = 0.7, max_tokens: int = None) -> str:
         """Generate text synchronously with locking and caching."""
         import time
+
         if max_tokens is None:
             max_tokens = self.config.model.generation.default_max_tokens
 
-        start_overall = time.time()
-        
         # Ensure model is loaded
         if self.model_manager.model is None:
             self.model_manager.load_model()
@@ -166,22 +173,21 @@ class MLXClient(LLMInterface):
             logger.info("Cache hit for generation")
             return self._generate_cache[cache_hash]
 
-        with MLX_LOCK:
-            logger.info("Starting MLX generation", max_tokens=max_tokens)
-            generation_start = time.time()
-            try:
-                response = generate(
-                    model=self.model_manager.model,
-                    tokenizer=self.model_manager.tokenizer,
-                    prompt=prompt,
-                    max_tokens=max_tokens,
-                    verbose=False,
-                )
-            except Exception as e:
-                logger.error("MLX generation failed", error=str(e))
-                raise
+        logger.info("Starting MLX generation", max_tokens=max_tokens)
+        generation_start = time.time()
+        try:
+            response = generate(
+                model=self.model_manager.model,
+                tokenizer=self.model_manager.tokenizer,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                verbose=False,
+            )
+        except Exception as e:
+            logger.error("MLX generation failed", error=str(e))
+            raise
 
-            logger.info("MLX generation completed", duration=time.time() - generation_start)
+        logger.info("MLX generation completed", duration=time.time() - generation_start)
 
         # Update cache
         if len(self._generate_cache) >= self._cache_size:
@@ -203,24 +209,22 @@ class MLXClient(LLMInterface):
         self.model_manager.unload_model()
         self.model_name = model_name
         self.model_manager = MLXModelManager(model_name)
-        self.model_manager.load_model()
-        self.formatter = MLXPromptFormatter(
-            self.model_manager.tokenizer, 
-            self.prompt_manager, 
-            self.model_manager.context_window
-        )
+        self._formatter = None
 
     def unload_model(self):
         """Unload model to free memory."""
         self.model_manager.unload_model()
+        self._formatter = None
 
     @property
     def context_window(self) -> int:
+        if self.model_manager.model is None:
+            return 4096  # Default
         return self.model_manager.context_window
 
     def __del__(self):
         try:
-            if hasattr(self, 'model_manager'):
+            if hasattr(self, "model_manager"):
                 self.model_manager.unload_model()
         except Exception:
             pass

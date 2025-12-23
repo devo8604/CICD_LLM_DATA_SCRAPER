@@ -80,7 +80,7 @@ class TestConfigScreenInteractions:
         """Test action_reset_config."""
         # Mock methods
         screen._update_config_value = MagicMock()
-        screen.populate_table = MagicMock()
+        screen.update_display = MagicMock()
         screen._get_default_value_for_key = MagicMock(return_value="default")
 
         # Setup config_values to have at least one key
@@ -93,34 +93,33 @@ class TestConfigScreenInteractions:
             screen.action_reset_config()
 
             screen._update_config_value.assert_called_with("llm.base_url", "default", "text")
-            screen.populate_table.assert_called()
+            screen.update_display.assert_called()
 
-    def test_row_selected_boolean(self, screen):
-        """Test toggling a boolean value."""
+    def test_edit_value_boolean(self, screen):
+        """Test toggling a boolean value via action_edit_value."""
         # Setup
         key = "llm.mlx_quantize"
-        screen.row_keys = {"row1": key}
+        screen.current_row_index = 0
+        screen.row_keys = {0: key}
         screen.config_values[key] = (False, "boolean")
         screen.settings_list.append((key, "Quantize", "boolean"))  # Ensure get_display_name works
 
         screen._update_config_value = MagicMock()
-        screen.populate_table = MagicMock()
-
-        event = MagicMock()
-        event.row_key = "row1"
+        screen.update_display = MagicMock()
 
         # Need to run async method
         import asyncio
 
-        asyncio.run(screen.on_data_table_row_selected(event))
+        asyncio.run(screen.action_edit_value())
 
         screen._update_config_value.assert_called_with(key, True, "boolean")
-        screen.populate_table.assert_called()
+        screen.update_display.assert_called()
 
-    def test_row_selected_input_dialog(self, screen):
-        """Test opening input dialog for text/int."""
+    def test_edit_value_input_dialog(self, screen):
+        """Test opening input dialog for text/int via action_edit_value."""
         key = "llm.max_retries"
-        screen.row_keys = {"row1": key}
+        screen.current_row_index = 0
+        screen.row_keys = {0: key}
         screen.config_values[key] = (3, "integer")
         screen.settings_list.append((key, "Retries", "integer"))
 
@@ -128,12 +127,9 @@ class TestConfigScreenInteractions:
             mock_app = MagicMock()
             mock_app_prop.return_value = mock_app
 
-            event = MagicMock()
-            event.row_key = "row1"
-
             import asyncio
 
-            asyncio.run(screen.on_data_table_row_selected(event))
+            asyncio.run(screen.action_edit_value())
 
             # Verify push_screen called
             mock_app.push_screen.assert_called()
@@ -144,11 +140,11 @@ class TestConfigScreenInteractions:
 
             # Test callback with valid integer
             screen._update_config_value = MagicMock()
-            screen.populate_table = MagicMock()
+            screen.update_display = MagicMock()
 
             callback("5")
             screen._update_config_value.assert_called_with(key, 5, "integer")
-            screen.populate_table.assert_called()
+            screen.update_display.assert_called()
 
             # Test callback with invalid integer
             screen._update_config_value.reset_mock()
@@ -161,13 +157,6 @@ class TestConfigScreenInteractions:
         """Test unsaved changes detection."""
         key = "test.key"
         screen.original_values[key] = "original"
-        screen.config = MagicMock()
-        # Mock _get_config_attr behavior via config_values?
-        # No, _get_config_attr reads from self.config via getattr
-
-        # We need to patch _get_config_attr or set attributes on self.config
-        # _get_config_attr logic is: attr_map.get(key) -> getattr(config, attr)
-        # But we can just mock _get_config_attr
 
         with patch.object(screen, "_get_config_attr") as mock_get:
             mock_get.return_value = "new"
@@ -178,4 +167,6 @@ class TestConfigScreenInteractions:
 
     def test_get_config_attr_unknown(self, screen):
         """Test _get_config_attr with unknown key."""
+        # Ensure model returns None for unknown sections to avoid MagicMock returning another Mock
+        screen.config.model.unknown = None
         assert screen._get_config_attr("unknown.key") is None

@@ -1,7 +1,8 @@
 """Database manager facade that delegates to specialized components."""
 
-import structlog
 from pathlib import Path
+
+import structlog
 
 from src.data.state_manager import StateManager
 from src.data.training_data_repository import TrainingDataRepository
@@ -27,11 +28,8 @@ class DBManager:
         Raises:
             TypeError: If db_path is not a string or Path object
         """
-        if not isinstance(db_path, (str, Path)):
-            raise TypeError(
-                f"db_path must be a str or Path, got {type(db_path).__name__}. "
-                f"Value: {repr(db_path)}"
-            )
+        if not isinstance(db_path, str | Path):
+            raise TypeError(f"db_path must be a str or Path, got {type(db_path).__name__}. Value: {repr(db_path)}")
 
         self.db_path = Path(db_path) if isinstance(db_path, str) else db_path
 

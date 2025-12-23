@@ -118,10 +118,7 @@ class MemoryManager:
             after_usage = self.get_memory_usage()
             usage_diff = after_usage.used - before_usage.used
 
-            logger.debug(
-                f"Memory after {operation_name}: {after_usage.percent_used:.1f}% used, "
-                f"diff: {usage_diff / 1024 / 1024:.1f}MB"
-            )
+            logger.debug(f"Memory after {operation_name}: {after_usage.percent_used:.1f}% used, diff: {usage_diff / 1024 / 1024:.1f}MB")
 
             # If memory usage increased significantly, force GC
             if usage_diff > 50 * 1024 * 1024:  # 50MB increase
@@ -134,10 +131,7 @@ class MemoryManager:
 
         # If not enough memory, try to free up some
         if usage.available < required_bytes:
-            logger.warning(
-                f"Not enough memory available: {usage.available / 1024 / 1024:.1f}MB, "
-                f"need {required_mb}MB. Attempting to free memory..."
-            )
+            logger.warning(f"Not enough memory available: {usage.available / 1024 / 1024:.1f}MB, need {required_mb}MB. Attempting to free memory...")
 
             self.force_garbage_collection()
             time.sleep(0.1)  # Brief pause to allow system to free memory

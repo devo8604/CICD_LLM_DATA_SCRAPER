@@ -160,12 +160,12 @@ The pipeline is configured via `cicdllm.yaml`. You can edit this file directly o
 ```yaml
 llm:
   # Backend selection: 'mlx' (Apple Silicon) or 'llama_cpp' (Standard)
-  backend: mlx  
-  
+  backend: mlx
+
   # For llama_cpp backend:
   base_url: http://localhost:11434
   model_name: ollama/llama3.2:3b
-  
+
   # For MLX backend:
   mlx_model_name: mlx-community/Qwen2.5-Coder-14B-Instruct-4bit
   mlx_quantize: true

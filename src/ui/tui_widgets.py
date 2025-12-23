@@ -208,7 +208,7 @@ class StatsWidget(Vertical):
     def update_stats(self) -> None:
         """Update statistics."""
         # Get repo counts
-        repos_dir = Path(self.config.model.base_dir) / self.config.model.pipeline.repos_dir_name
+        repos_dir = Path(self.config.model.pipeline.base_dir) / self.config.model.pipeline.repos_dir_name
         repo_count = 0
         if repos_dir.exists():
             for org_dir in repos_dir.iterdir():
@@ -217,7 +217,7 @@ class StatsWidget(Vertical):
                         if repo_dir.is_dir() and not repo_dir.name.startswith("."):
                             repo_count += 1
 
-        repos_file = Path(self.config.model.base_dir) / "repos.txt"
+        repos_file = Path(self.config.model.pipeline.base_dir) / "repos.txt"
         repos_txt_count = 0
         if repos_file.exists():
             try:
@@ -251,6 +251,7 @@ class StatsWidget(Vertical):
 
         # Calculate average rate based on elapsed time from the tracker
         from src.ui.progress_tracker import get_progress_tracker
+
         tracker = get_progress_tracker()
         summary = tracker.get_progress_summary()
         elapsed_time = summary.get("elapsed_time", 0)
@@ -338,13 +339,13 @@ class ProgressTrackingWidget(Static):
             parts.append(f"{h}h")
         if m > 0:
             parts.append(f"{m}m")
-        if s > 0 and not w and not d: # Only show seconds if duration is short
+        if s > 0 and not w and not d:  # Only show seconds if duration is short
             parts.append(f"{s}s")
 
         if not parts:
             return "0s"
 
-        return " ".join(parts[:2]) # Show only the two most significant units for clarity
+        return " ".join(parts[:2])  # Show only the two most significant units for clarity
 
     def watch_progress_summary(self, summary: dict) -> None:
         """Called when progress summary changes."""
@@ -387,11 +388,11 @@ class ProgressTrackingWidget(Static):
         # Format file size appropriately (B, KB, or MB)
         def format_file_size(size_bytes):
             if size_bytes >= 1024 * 1024:  # MB
-                return f'{size_bytes / (1024*1024):.2f}MB'
+                return f"{size_bytes / (1024 * 1024):.2f}MB"
             elif size_bytes >= 1024:  # KB
-                return f'{size_bytes / 1024:.2f}KB'
+                return f"{size_bytes / 1024:.2f}KB"
             else:  # B
-                return f'{size_bytes}B'
+                return f"{size_bytes}B"
 
         # Format file path to show just the filename
         file_name = ""
@@ -568,7 +569,7 @@ class LogPanel(RichLog):
     def log_message(self, message: str, level: str = "info") -> None:
         """Log a message with appropriate styling."""
         from rich.text import Text
-        
+
         colors = {
             "info": "blue",
             "success": "green",
@@ -577,15 +578,15 @@ class LogPanel(RichLog):
         }
         color = colors.get(level, "white")
         timestamp = time.strftime("%H:%M:%S")
-        
+
         # message might contain ANSI codes if coming from ConsoleRenderer
         # We convert it to a Text object which handles ANSI, then wrap it in our markup
         ansi_text = Text.from_ansi(message)
-        
+
         # Create final line with timestamp and color
         final_line = Text(f"[{timestamp}] ", style=color)
         final_line.append(ansi_text)
-        
+
         self.write(final_line)
 
 

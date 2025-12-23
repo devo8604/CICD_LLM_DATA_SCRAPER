@@ -25,10 +25,7 @@ class TestBatteryManagement:
     def test_check_battery_status_success(self, mock_run):
         """Test successful battery status retrieval on macOS."""
         mock_run.return_value = MagicMock(
-            stdout=(
-                "Now drawing from 'AC Power'\n -InternalBattery-0 (id=1234567)\t"
-                "85%; charging; 1:23 remaining present: true\n"
-            ),
+            stdout=("Now drawing from 'AC Power'\n -InternalBattery-0 (id=1234567)\t85%; charging; 1:23 remaining present: true\n"),
             returncode=0,
         )
 
@@ -79,10 +76,7 @@ class TestBatteryManagement:
     def test_check_battery_status_low_battery(self, mock_run):
         """Test battery status retrieval with low battery."""
         mock_run.return_value = MagicMock(
-            stdout=(
-                "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=1234567)\t"
-                "12%; discharging; 0:23 remaining present: true\n"
-            ),
+            stdout=("Now drawing from 'Battery Power'\n -InternalBattery-0 (id=1234567)\t12%; discharging; 0:23 remaining present: true\n"),
             returncode=0,
         )
 
@@ -95,10 +89,7 @@ class TestBatteryManagement:
     def test_check_battery_status_full_battery(self, mock_run):
         """Test battery status at 100%."""
         mock_run.return_value = MagicMock(
-            stdout=(
-                "Now drawing from 'AC Power'\n -InternalBattery-0 (id=1234567)\t"
-                "100%; charged; 0:00 remaining present: true\n"
-            ),
+            stdout=("Now drawing from 'AC Power'\n -InternalBattery-0 (id=1234567)\t100%; charged; 0:00 remaining present: true\n"),
             returncode=0,
         )
 
@@ -272,9 +263,7 @@ class TestRepoURLs:
     def test_get_repo_urls_with_inline_whitespace(self, tmp_path):
         """Test URLs with leading/trailing whitespace."""
         repos_file = tmp_path / "repos.txt"
-        repos_file.write_text(
-            "  https://github.com/user/repo1  \n\thttps://github.com/user/repo2\t\nhttps://github.com/user/repo3\n"
-        )
+        repos_file.write_text("  https://github.com/user/repo1  \n\thttps://github.com/user/repo2\t\nhttps://github.com/user/repo3\n")
 
         urls = get_repo_urls_from_file(str(repos_file))
 
@@ -421,6 +410,7 @@ class TestGitOperations:
         clone_or_update_repos("/etc", ["http://github.com/repo"])
         # Should log error and return
 
+
 class TestCodeProcessingUtils:
     def test_estimate_tokens(self):
         assert estimate_tokens("hello world") == 2
@@ -428,7 +418,7 @@ class TestCodeProcessingUtils:
 
     def test_smart_split_code(self):
         content = "line1\nline2\nline3\nline4"
-        # 4 chars per token, so each line is ~1.25 tokens. 
+        # 4 chars per token, so each line is ~1.25 tokens.
         # content is ~20 chars = 5 tokens.
         chunks = smart_split_code(content, max_context_tokens=3, overlap_ratio=0)
         assert len(chunks) > 1

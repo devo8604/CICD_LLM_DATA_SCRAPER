@@ -73,6 +73,9 @@ class TestBatchProcessingService:
         # Verify all results
         assert len(results) == 3
 
+        # Sort results by file path to ensure deterministic order for assertions
+        results.sort(key=lambda x: x[0])
+
         # Check each result
         file_path1, success1, qa_count1 = results[0]
         file_path2, success2, qa_count2 = results[1]

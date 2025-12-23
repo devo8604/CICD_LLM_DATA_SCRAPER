@@ -141,7 +141,7 @@ class PipelineTUIApp(App):
 
         try:
             bottom_log_widget = self.query_one("#log-widget", LogPanel)
-            
+
             # Clear existing handlers from root logger to avoid duplicate/hidden output
             root_logger = logging.getLogger()
             for handler in root_logger.handlers[:]:
@@ -298,6 +298,7 @@ class PipelineTUIApp(App):
         if self._orchestrator is None:
             from src.pipeline.di_container import setup_container
             from src.pipeline.orchestration_service import OrchestrationService
+
             container = setup_container(self.config)
             self._orchestrator = container.get(OrchestrationService)
         return self._orchestrator
@@ -306,7 +307,7 @@ class PipelineTUIApp(App):
         """Background task to run the prepare process."""
         try:
             orchestrator = self._get_orchestrator()
-            
+
             self._cancellation_event = threading.Event()
 
             def processing_started_callback():
@@ -357,6 +358,7 @@ class PipelineTUIApp(App):
                         sw.status_text = "Processing"
                 except Exception:
                     pass
+
             self.set_timer(0.5, ensure_processing_status)
         except Exception as e:
             logger.error("Failed to start preparation", error=str(e))
@@ -401,6 +403,7 @@ class PipelineTUIApp(App):
     def action_force_quit(self) -> None:
         """Force quit the application."""
         import sys
+
         logger.warning("Force quit initiated")
         if self._processing_task:
             try:
@@ -411,6 +414,7 @@ class PipelineTUIApp(App):
 
     def action_toggle_command_palette(self) -> None:
         """Open the command palette."""
+
         def handle_action(action_name: str | None) -> None:
             if action_name:
                 method_name = f"action_{action_name}"
@@ -422,12 +426,14 @@ class PipelineTUIApp(App):
                         method()
                 elif action_name == "toggle_dark":
                     self.dark = not self.dark
+
         self.push_screen(CommandPalette(), handle_action)
 
     def action_reload_prompts(self) -> None:
         """Reload all prompts from the prompts directory."""
         try:
             from src.llm.prompt_utils import get_prompt_manager
+
             pm = get_prompt_manager(theme=self.config.model.pipeline.prompt_theme)
             pm.load_prompts()
             self.query_one("#log-widget", LogPanel).log_message("✅ Prompts reloaded", "success")

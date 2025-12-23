@@ -13,37 +13,40 @@ from src.pipeline.scraping_service import ScrapingService
 
 
 class TestExportService:
-        @patch("src.pipeline.export_service.DataExporter")
-        def test_export_success(self, mock_exporter_cls):
-            mock_db_manager = MagicMock(spec=DBManager)
-            mock_db_manager.db_path = "db.sqlite"
-            from src.core.config import AppConfig
-            mock_config = AppConfig()
+    @patch("src.pipeline.export_service.DataExporter")
+    def test_export_success(self, mock_exporter_cls):
+        mock_db_manager = MagicMock(spec=DBManager)
+        mock_db_manager.db_path = "db.sqlite"
+        from src.core.config import AppConfig
 
-            service = ExportService(mock_db_manager, mock_config)
-            service.export("template", "output.json")
+        mock_config = AppConfig()
 
-            # DataExporter is called with both db_manager and config (both are required now)
-            mock_exporter_cls.assert_called()
-            # Check that the call was made with both db_manager and config
-            call_args = mock_exporter_cls.call_args
-            assert call_args[0][0] == mock_db_manager  # First arg is db_manager
-            assert call_args[0][1] is not None  # Second arg is config
-            mock_exporter_cls.return_value.export_data.assert_called_with("template", "output.json")
+        service = ExportService(mock_db_manager, mock_config)
+        service.export("template", "output.json")
 
-        @patch("src.pipeline.export_service.DataExporter")
-        def test_export_failure(self, mock_exporter_cls):
-            mock_db_manager = MagicMock(spec=DBManager)
-            mock_db_manager.db_path = "db.sqlite"
-            from src.core.config import AppConfig
-            mock_config = AppConfig()
-            mock_exporter_cls.return_value.export_data.side_effect = Exception("Fail")
+        # DataExporter is called with both db_manager and config (both are required now)
+        mock_exporter_cls.assert_called()
+        # Check that the call was made with both db_manager and config
+        call_args = mock_exporter_cls.call_args
+        assert call_args[0][0] == mock_db_manager  # First arg is db_manager
+        assert call_args[0][1] is not None  # Second arg is config
+        mock_exporter_cls.return_value.export_data.assert_called_with("template", "output.json")
 
-            service = ExportService(mock_db_manager, mock_config)
-            service.export("template", "output.json")
+    @patch("src.pipeline.export_service.DataExporter")
+    def test_export_failure(self, mock_exporter_cls):
+        mock_db_manager = MagicMock(spec=DBManager)
+        mock_db_manager.db_path = "db.sqlite"
+        from src.core.config import AppConfig
 
-            # Verify export_data was attempted
-            mock_exporter_cls.return_value.export_data.assert_called()
+        mock_config = AppConfig()
+        mock_exporter_cls.return_value.export_data.side_effect = Exception("Fail")
+
+        service = ExportService(mock_db_manager, mock_config)
+        service.export("template", "output.json")
+
+        # Verify export_data was attempted
+        mock_exporter_cls.return_value.export_data.assert_called()
+
 
 class TestScrapingService:
     def test_scrape(self):

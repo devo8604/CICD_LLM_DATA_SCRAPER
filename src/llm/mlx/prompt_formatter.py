@@ -1,5 +1,6 @@
 "MLX Prompt formatting and parsing utilities."
 
+
 class MLXPromptFormatter:
     """Handles formatting prompts and parsing responses for MLX models."""
 
@@ -12,7 +13,7 @@ class MLXPromptFormatter:
         """Format the prompt for question generation."""
         safe_limit = self.context_window - 1000
         if safe_limit < 500:
-             safe_limit = 500
+            safe_limit = 500
 
         truncated_content = self._truncate_to_tokens(content, safe_limit)
 
@@ -29,7 +30,7 @@ class MLXPromptFormatter:
             f"INSTRUCTION: {instruction}\n\n"
             f"{instructional_part}\n\n"
             "IMPORTANT: Return only clear, specific questions. Each question should be on its own line, formatted as "
-            '\"Q1: What does this content do?\", \"Q2: How is this organized?\", etc. '
+            '"Q1: What does this content do?", "Q2: How is this organized?", etc. '
             "Do NOT include ANSWER: sections or empty code blocks like ``` in your response."
         )
 
@@ -51,11 +52,7 @@ class MLXPromptFormatter:
 
         instructional_part = self.prompt_manager.get_prompt("answer_user")
 
-        user_msg = (
-            f"CONTENT FOR REFERENCE:\n```\n{truncated_content}\n```\n\n"
-            f"SPECIFIC QUESTION (ANSWER THIS EXACTLY): {question}\n\n"
-            f"RESPONSE: {instructional_part}"
-        )
+        user_msg = f"CONTENT FOR REFERENCE:\n```\n{truncated_content}\n```\n\nSPECIFIC QUESTION (ANSWER THIS EXACTLY): {question}\n\nRESPONSE: {instructional_part}"
 
         return self._apply_chat_template(system_msg, user_msg)
 
@@ -68,7 +65,7 @@ class MLXPromptFormatter:
 
         if hasattr(self.tokenizer, "apply_chat_template"):
             return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        
+
         # Fallback
         prompt_parts = []
         for message in messages:
@@ -95,6 +92,7 @@ class MLXPromptFormatter:
 
             if ":" in line and line.startswith(("Q", "q")):
                 import re
+
                 q_pattern = r"^[Qq]\d+:\s*(.+?\?)$"
                 match = re.match(q_pattern, line)
                 if match:
@@ -129,6 +127,7 @@ class MLXPromptFormatter:
                         questions.append(question)
 
             import re
+
             numbered_pattern = r"\d+\.\s*(.+?\?)"
             matches = re.findall(numbered_pattern, line)
             for match in matches:

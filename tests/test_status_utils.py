@@ -27,6 +27,11 @@ def config():
     config.DATA_DIR = "data"
     config.REPOS_DIR_NAME = "repos"
     config.DB_PATH = "pipeline.db"
+
+    # Mock model properties accessed by new code
+    config.model.pipeline.base_dir = config.BASE_DIR
+    config.model.pipeline.repos_dir_name = config.REPOS_DIR_NAME
+
     return config
 
 
@@ -223,13 +228,7 @@ class TestPipelineStatus:
     def test_get_repos_txt_count_with_repos(self, config, temp_data_dir):
         """Test repos.txt count with sample repos."""
         repos_file = Path(config.BASE_DIR) / "repos.txt"
-        repos_file.write_text(
-            "https://github.com/user/repo1\n"
-            "https://github.com/user/repo2\n"
-            "# Comment line\n"
-            "\n"
-            "https://github.com/user/repo3\n"
-        )
+        repos_file.write_text("https://github.com/user/repo1\nhttps://github.com/user/repo2\n# Comment line\n\nhttps://github.com/user/repo3\n")
 
         status = PipelineStatus(config, temp_data_dir)
         count = status.get_repos_txt_count()

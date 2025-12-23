@@ -42,6 +42,22 @@ class TestDIContainer:
         config.LLM_MAX_RETRIES = 3
         config.LLM_RETRY_DELAY = 1
         config.LLM_REQUEST_TIMEOUT = 10
+
+        # Mock model properties
+        config.model.use_mlx = False
+        config.model.llm.base_url = "http://localhost"
+        config.model.llm.model_name = "test-model"
+        config.model.llm.max_retries = 3
+        config.model.llm.retry_delay = 1
+        config.model.llm.request_timeout = 10
+        config.model.mlx.model_name = "mlx-model"
+        config.model.pipeline.data_dir = "data"
+        config.REPOS_DIR = "repos"
+        config.model.pipeline.repos_dir_name = "repos"
+        config.model.pipeline.max_file_size = 1024
+        config.model.pipeline.allowed_extensions = []
+        config.model.pipeline.allowed_json_md_files = []
+
         return config
 
     @pytest.fixture
@@ -72,15 +88,17 @@ class TestDIContainer:
         # We don't patch the class globally to avoid breaking 'is' checks in DIContainer
         mock_instance = MagicMock(spec=AppConfig)
         factory = MagicMock(return_value=mock_instance)
-        
-        # Clear existing config to force factory call
+
+        # Reset container state
         container._services.pop(AppConfig, None)
         container._config = None
-        
+
         container.register_factory(AppConfig, factory)
 
+        # First access via get() should trigger factory
         instance1 = container.get(AppConfig)
-        instance2 = container.get(AppConfig)
+        # Second access via config property should return same instance without factory call
+        instance2 = container.config
 
         assert instance1 is instance2
         factory.assert_called_once()
@@ -120,6 +138,7 @@ class TestDIContainer:
 
     def test_create_llm_client_standard(self, container):
         container.config.USE_MLX = False
+        container.config.model.use_mlx = False
         with patch("src.pipeline.di_container.LLMClient") as mock_cls:
             client = create_llm_client(container)
             mock_cls.assert_called()
@@ -127,7 +146,9 @@ class TestDIContainer:
 
     def test_create_llm_client_mlx(self, container):
         container.config.USE_MLX = True
+        container.config.model.use_mlx = True
         container.config.MLX_MODEL_NAME = "mlx-model"
+        container.config.model.mlx.model_name = "mlx-model"
         with patch("src.pipeline.di_container.MLXClient") as mock_cls:
             client = create_llm_client(container)
             mock_cls.assert_called()
@@ -135,13 +156,16 @@ class TestDIContainer:
 
     def test_create_llm_client_mlx_invalid(self, container):
         container.config.USE_MLX = True
+        container.config.model.use_mlx = True
         container.config.MLX_MODEL_NAME = "invalid-model"
-        
+        container.config.model.mlx.model_name = "invalid-model"
+
         with patch("src.pipeline.di_container.MLXClient") as mock_cls:
             create_llm_client(container)
             mock_cls.assert_called()
 
         container.config.MLX_MODEL_NAME = ""
+        container.config.model.mlx.model_name = ""
         with pytest.raises(ValueError):
             create_llm_client(container)
 

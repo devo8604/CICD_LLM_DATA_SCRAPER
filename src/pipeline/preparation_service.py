@@ -39,7 +39,7 @@ class PreparationService:
         self.batch_processing_service = batch_processing_service
         self.state_service = state_management_service
         self.config = config
-        self.repos_dir = os.path.join(self.config.model.base_dir, "repos")
+        self.repos_dir = os.path.join(self.config.model.pipeline.base_dir, "repos")
         self.progress_tracker = get_progress_tracker() if get_progress_tracker else None
         self.last_cleanup_time = datetime.now()
         self.cleanup_manager = DiskCleanupManager(config)
@@ -111,7 +111,7 @@ class PreparationService:
         current_repo = self.state_service.state["current_repo_name"]
         if current_repo and current_repo in all_repos:
             repo_start_index = all_repos.index(current_repo)
-            logger.info("Resuming preparation", repo=os.path.basename(current_repo), index=repo_start_index+1, total=len(all_repos))
+            logger.info("Resuming preparation", repo=os.path.basename(current_repo), index=repo_start_index + 1, total=len(all_repos))
         else:
             self.state_service.state["current_repo_name"] = None
             self.state_service.state["processed_repos_count"] = 0
@@ -243,9 +243,7 @@ class PreparationService:
                 dynamic_ncols=True,
                 unit="Q",
             )
-            success, qa_count = self.file_processing_service.process_single_file(
-                file_path, repo_name, pbar=pbar, cancellation_event=cancellation_event
-            )
+            success, qa_count = self.file_processing_service.process_single_file(file_path, repo_name, pbar=pbar, cancellation_event=cancellation_event)
             repo_file_pbar.update(1)
 
             if self.progress_tracker:
@@ -285,5 +283,6 @@ class PreparationService:
                 for _ in batch_files:
                     self.progress_tracker.increment_repo_files_processed()
 
-            self.state_service.state["current_file_path_in_repo"] = batch_files[-1]
-            self.state_service.save_state()
+            if batch_files:
+                self.state_service.state["current_file_path_in_repo"] = batch_files[-1]
+                self.state_service.save_state()

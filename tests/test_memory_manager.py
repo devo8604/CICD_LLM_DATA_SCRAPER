@@ -17,6 +17,13 @@ class TestMemoryManager:
         config = MagicMock(spec=AppConfig)
         config.MAX_FILE_SIZE = 1000
         config.CHUNK_READ_SIZE = 100
+        config.model.pipeline.max_file_size = 1000
+        config.model.processing.chunk_read_size = 100
+
+        # Add model properties
+        config.model.pipeline.max_file_size = 1000
+        config.model.processing.chunk_read_size = 100
+
         return config
 
     @pytest.fixture
@@ -140,6 +147,8 @@ class TestFileReader:
         config = MagicMock(spec=AppConfig)
         config.MAX_FILE_SIZE = 1000
         config.CHUNK_READ_SIZE = 100
+        config.model.pipeline.max_file_size = 1000
+        config.model.processing.chunk_read_size = 100
         return config
 
     @pytest.fixture
@@ -175,7 +184,7 @@ class TestFileReader:
         # if len(content) > chunk_size * 10: ...
 
         chunk_size = 10
-        file_reader.config.CHUNK_READ_SIZE = chunk_size
+        file_reader.config.model.processing.chunk_read_size = chunk_size
 
         # Make content large enough
         content = "a" * (chunk_size * 10 + 5)
@@ -218,6 +227,8 @@ class TestLargeFileManager:
         config = MagicMock(spec=AppConfig)
         config.MAX_FILE_SIZE = 1000
         config.CHUNK_READ_SIZE = 100
+        config.model.pipeline.max_file_size = 1000
+        config.model.processing.chunk_read_size = 100
         return config
 
     @pytest.fixture

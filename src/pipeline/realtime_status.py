@@ -146,7 +146,7 @@ class RealTimeStatus:
 
     def get_repository_count(self) -> int:
         """Count repositories in repos directory."""
-        repos_dir = Path(self.config.model.base_dir) / self.config.model.pipeline.repos_dir_name
+        repos_dir = Path(self.config.model.pipeline.base_dir) / self.config.model.pipeline.repos_dir_name
         if not repos_dir.exists():
             return 0
 
@@ -169,7 +169,7 @@ class RealTimeStatus:
 
     def get_repos_txt_count(self) -> int:
         """Count repositories listed in repos.txt."""
-        repos_file = Path(self.config.model.base_dir) / "repos.txt"
+        repos_file = Path(self.config.model.pipeline.base_dir) / "repos.txt"
         if not repos_file.exists():
             return 0
 

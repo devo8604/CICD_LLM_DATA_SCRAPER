@@ -22,9 +22,7 @@ class TestRepositoryServiceFull:
     @patch("src.pipeline.repository_service.clone_or_update_repos")
     @patch("os.walk")
     @patch("builtins.open", new_callable=mock_open)
-    def test_scrape_repositories_github_org(
-        self, mock_file, mock_walk, mock_clone, mock_get_github, mock_get_urls, service
-    ):
+    def test_scrape_repositories_github_org(self, mock_file, mock_walk, mock_clone, mock_get_github, mock_get_urls, service):
         mock_get_urls.return_value = ["https://github.com/org"]
         mock_get_github.return_value = [
             "https://github.com/org/repo1",
@@ -47,7 +45,7 @@ class TestRepositoryServiceFull:
         }
 
         # Check file write
-        mock_file.assert_called_with("data/repo_count.txt", "w")
+        mock_file.assert_called_with("data/repo_count.txt", "w", encoding="utf-8")
         mock_file().write.assert_called_with("2")
 
     @patch("src.pipeline.repository_service.get_repo_urls_from_file")
@@ -55,9 +53,7 @@ class TestRepositoryServiceFull:
     @patch("src.pipeline.repository_service.clone_or_update_repos")
     @patch("os.walk")
     @patch("builtins.open", new_callable=mock_open)
-    def test_scrape_repositories_direct_repo(
-        self, mock_file, mock_walk, mock_clone, mock_get_github, mock_get_urls, service
-    ):
+    def test_scrape_repositories_direct_repo(self, mock_file, mock_walk, mock_clone, mock_get_github, mock_get_urls, service):
         mock_get_urls.return_value = ["https://github.com/org/repo"]
         mock_walk.return_value = [("/repos/repo", [".git"], [])]
 
@@ -95,9 +91,7 @@ class TestRepositoryServiceFull:
     @patch("src.pipeline.repository_service.clone_or_update_repos")
     @patch("os.walk")
     @patch("builtins.open", new_callable=mock_open)
-    def test_scrape_repositories_empty_org(
-        self, mock_file, mock_walk, mock_clone, mock_get_github, mock_get_urls, service
-    ):
+    def test_scrape_repositories_empty_org(self, mock_file, mock_walk, mock_clone, mock_get_github, mock_get_urls, service):
         mock_get_urls.return_value = ["https://github.com/empty-org"]
         mock_get_github.return_value = []  # Empty
 

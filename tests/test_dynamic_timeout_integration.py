@@ -4,13 +4,8 @@ Integration test to verify dynamic timeouts work correctly in file processing.
 
 import os
 import tempfile
-from unittest.mock import Mock, patch
-import pytest
 
-from src.pipeline.file_processing_service import FileProcessingService
 from src.core.config import AppConfig
-from src.data.db_manager import DBManager
-from src.llm.llm_client import LLMClient
 
 
 def test_dynamic_timeout_integration():
@@ -24,7 +19,7 @@ def test_dynamic_timeout_integration():
     print(f"Default LLM_REQUEST_TIMEOUT: {default_timeout}s")
 
     # Create a temporary file of known size
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_file:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as temp_file:
         # Write 4MB of content (should result in ~600s timeout based on square root scaling)
         large_content = "This is a test file content. " * (4 * 1024 * 1024 // 30)
         temp_file.write(large_content)
@@ -37,10 +32,7 @@ def test_dynamic_timeout_integration():
             from src.core.utils import calculate_dynamic_timeout
 
             # Calculate expected timeout for this file size
-            expected_timeout = calculate_dynamic_timeout(
-                file_path,
-                base_timeout=default_timeout
-            )
+            expected_timeout = calculate_dynamic_timeout(file_path, base_timeout=default_timeout)
 
             print(f"File size: {file_size} bytes")
             print(f"Expected timeout: {expected_timeout} seconds")
@@ -49,7 +41,7 @@ def test_dynamic_timeout_integration():
             # Calculate expected timeout based on actual file size
             reference_size = 1024 * 1024  # 1MB
             scaling_factor = file_size / reference_size
-            expected_calc = int(300 * (scaling_factor ** 0.5))
+            expected_calc = int(300 * (scaling_factor**0.5))
 
             assert expected_timeout == expected_calc, f"Expected {expected_calc}s for {file_size} byte file, got {expected_timeout}s"
 
@@ -66,7 +58,7 @@ def test_small_file_dynamic_timeout():
     default_timeout = config.model.llm.request_timeout
 
     # Create a small temporary file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_file:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as temp_file:
         # Write small content (< 1KB)
         small_content = "Small test content."
         temp_file.write(small_content)
@@ -78,12 +70,7 @@ def test_small_file_dynamic_timeout():
             from src.core.utils import calculate_dynamic_timeout
 
             # Calculate expected timeout for small file
-            expected_timeout = calculate_dynamic_timeout(
-                file_path,
-                base_timeout=default_timeout,
-                min_timeout=30,
-                max_timeout=3600
-            )
+            expected_timeout = calculate_dynamic_timeout(file_path, base_timeout=default_timeout, min_timeout=30, max_timeout=3600)
 
             print(f"Small file timeout: {expected_timeout} seconds")
 
