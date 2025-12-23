@@ -92,7 +92,26 @@ class TrainingDataRepository:
                 )
                 """
             )
-        logger.debug("Ensured TrainingDataRepository tables exist")
+
+            # Create indexes for performance optimization
+            # These use IF NOT EXISTS so they're safe to run on every connection
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_training_samples_dataset_source "
+                "ON TrainingSamples(dataset_source)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conversation_turns_sample_id "
+                "ON ConversationTurns(sample_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conversation_turns_role "
+                "ON ConversationTurns(role)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_file_hashes_file_path "
+                "ON FileHashes(file_path)"
+            )
+        logger.debug("Ensured TrainingDataRepository tables and indexes exist")
 
     def add_failed_file(self, file_path: str, reason: str) -> None:
         """Add a failed file to the database."""
@@ -175,7 +194,7 @@ class TrainingDataRepository:
                 INSERT INTO ConversationTurns (sample_id, turn_index, role, content, is_label)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                conversation_turns_data
+                conversation_turns_data,
             )
         logger.debug("Added Q&A samples in batch", file_path=file_path, count=len(qa_pairs))
         return sample_ids
@@ -196,13 +215,16 @@ class TrainingDataRepository:
             # and collect content individually to avoid dynamic query building
             questions = set()
             for sample_id in sample_ids_for_file:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT T1.content
                     FROM ConversationTurns T1
                     INNER JOIN ConversationTurns T2
                     ON T1.sample_id = T2.sample_id
                     WHERE T1.sample_id = ? AND T1.role = 'user' AND T2.role = 'assistant'
-                """, (sample_id,))
+                """,
+                    (sample_id,),
+                )
 
                 for row in cursor.fetchall():
                     questions.add(hashlib.sha256(row[0].encode("utf-8")).hexdigest())
